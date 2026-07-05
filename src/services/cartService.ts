@@ -4,31 +4,53 @@ import {
     getDocs,
     getDoc,
     setDoc,
-    addDoc,
     updateDoc,
     query,
     where,
-    orderBy,
     serverTimestamp,
     DocumentData,
-    QueryDocumentSnapshot
+    QueryDocumentSnapshot,
+    writeBatch,
+    increment,
+    onSnapshot,
+    Unsubscribe
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { CartItem, Order } from '../types';
 
+const getTimestampTime = (value: any): number => {
+    if (!value) return 0;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value?.toDate === 'function') return value.toDate().getTime();
+
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+};
+
 export const cartService = {
     /**
-     * Salvar carrinho do usuário
+     * Salvar carrinho do usuário no Firestore (dentro do documento do usuário)
      */
-    async saveCart(userId: string, items: CartItem[]): Promise<{ success: boolean; error?: string }> {
+    async saveCart(userId: string, cartItems: CartItem[]): Promise<{ success: boolean; error?: string }> {
         try {
-            await setDoc(doc(db, 'carts', userId), {
-                items,
-                updatedAt: serverTimestamp(),
+            const cleanCart = cartItems.map((item) => ({
+                id: item.id,
+                name: item.name,
+                price: item.price,
+                image: item.image,
+                qty: item.qty,
+                category: item.category || "",
+                brand: item.brand || "",
+            }));
+
+            await setDoc(doc(db, 'users', userId), {
+                cart: cleanCart,
+                cartUpdatedAt: new Date().toISOString(),
             }, { merge: true });
+
             return { success: true };
         } catch (error: any) {
-            console.error('Erro ao salvar carrinho:', error);
+            console.error("Erro ao salvar carrinho:", error);
             return { success: false, error: error.message };
         }
     },
@@ -38,86 +60,125 @@ export const cartService = {
      */
     async loadCart(userId: string): Promise<CartItem[]> {
         try {
-            const cartDoc = await getDoc(doc(db, 'carts', userId));
-            if (cartDoc.exists()) {
-                const data = cartDoc.data();
-                return data.items || [];
+            const userDoc = await getDoc(doc(db, 'users', userId));
+            if (!userDoc.exists()) {
+                return [];
             }
-            return [];
+
+            const userData = userDoc.data();
+            const cart = userData?.cart || [];
+
+            return cart;
         } catch (error) {
-            console.error('Erro ao carregar carrinho:', error);
+            console.error("Erro ao carregar carrinho:", error);
             return [];
         }
     },
 
     /**
-     * Criar pedido
+     * Criar pedido COM ATUALIZAÇÃO DE ESTOQUE (igual ao original)
      */
     async createOrder(
         userId: string,
-        items: CartItem[],
-        total: number,
-        customerData: any
+        cartItems: CartItem[],
+        totalAmount: number,
+        customerData: any,
+        paymentMethod: string = "multicaixa"
     ): Promise<{ success: boolean; orderId?: string; orderNumber?: string; error?: string }> {
         try {
-            const orderNumber = 'ORD-' + Date.now().toString().slice(-8);
+            const orderNumber = "ORD-" + Date.now().toString().slice(-8);
 
+            // 1. Criar pedido no Firestore
             const orderData = {
-                userId,
-                orderNumber,
-                items: items.map(item => ({
+                userId: userId,
+                orderNumber: orderNumber,
+                items: cartItems.map((item) => ({
                     id: item.id,
                     name: item.name,
                     price: item.price,
                     image: item.image,
                     qty: item.qty,
-                    category: item.category || '',
-                    brand: item.brand || '',
+                    category: item.category || "",
+                    brand: item.brand || "",
                 })),
-                total,
-                status: 'awaiting_payment',
-                paymentMethod: 'multicaixa',
+                total: totalAmount,
+                status: "awaiting_payment",
+                paymentMethod: paymentMethod,
                 customer: customerData,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
             };
 
-            const docRef = await addDoc(collection(db, 'orders'), orderData);
+            // Usar Batch Write para garantir atomicidade entre pedido e estoque
+            const batch = writeBatch(db);
 
-            // Limpar carrinho após pedido
-            await setDoc(doc(db, 'carts', userId), {
-                items: [],
-                updatedAt: serverTimestamp(),
-            }, { merge: true });
+            // Adicionar o pedido ao batch
+            const orderRef = doc(collection(db, 'orders'));
+            batch.set(orderRef, orderData);
 
+            // 2. ATUALIZAR ESTOQUE DOS PRODUTOS
+            for (const item of cartItems) {
+                if (item.id && item.qty) {
+                    const productRef = doc(db, 'products', item.id);
+                    // Usar increment para operação atômica e segura
+                    batch.update(productRef, {
+                        stock: increment(-item.qty),
+                    });
+                }
+            }
+
+            // 3. LIMPAR CARRINHO DO USUÁRIO
+            const userDocRef = doc(db, 'users', userId);
+            batch.update(userDocRef, {
+                cart: [],
+                cartUpdatedAt: new Date().toISOString(),
+            });
+
+            // 4. EXECUTAR TODAS AS OPERAÇÕES EM LOTE
+            await batch.commit();
+
+            // 5. Retornar sucesso
             return {
                 success: true,
-                orderId: docRef.id,
-                orderNumber,
+                orderId: orderRef.id,
+                orderNumber: orderNumber,
             };
         } catch (error: any) {
-            console.error('Erro ao criar pedido:', error);
-            return { success: false, error: error.message };
+            console.error("Erro no pedido:", error);
+            return {
+                success: false,
+                error: error.message,
+            };
         }
     },
 
     /**
-     * Buscar pedidos do usuário
+     * Buscar pedidos do usuário (com ordenação no cliente para evitar índice)
      */
     async getOrders(userId: string): Promise<Order[]> {
         try {
+            // Usar apenas where, sem orderBy para evitar índice
             const q = query(
                 collection(db, 'orders'),
-                where('userId', '==', userId),
-                orderBy('createdAt', 'desc')
+                where('userId', '==', userId)
             );
             const snapshot = await getDocs(q);
-            return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+
+            let orders = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
                 id: doc.id,
                 ...doc.data() as Omit<Order, 'id'>,
             }));
+
+            // Ordenar no cliente (mais recentes primeiro)
+            orders.sort((a, b) => {
+                const dateA = getTimestampTime(a.createdAt);
+                const dateB = getTimestampTime(b.createdAt);
+                return dateB - dateA;
+            });
+
+            return orders;
         } catch (error) {
-            console.error('Erro ao buscar pedidos:', error);
+            console.error("Erro ao buscar pedidos:", error);
             return [];
         }
     },
@@ -125,24 +186,29 @@ export const cartService = {
     /**
      * Buscar todos os pedidos (Admin)
      */
-    async getAllOrders(statusFilter?: string): Promise<Order[]> {
+    async getAllOrders(statusFilter: string = "all"): Promise<Order[]> {
         try {
-            const constraints = [];
+            const q = statusFilter && statusFilter !== "all"
+                ? query(collection(db, 'orders'), where('status', '==', statusFilter))
+                : collection(db, 'orders');
 
-            if (statusFilter && statusFilter !== 'all') {
-                constraints.push(where('status', '==', statusFilter));
-            }
-
-            constraints.push(orderBy('createdAt', 'desc'));
-
-            const q = query(collection(db, 'orders'), ...constraints);
             const snapshot = await getDocs(q);
-            return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+
+            let orders = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
                 id: doc.id,
                 ...doc.data() as Omit<Order, 'id'>,
             }));
+
+            // Ordenar no cliente (mais recentes primeiro)
+            orders.sort((a, b) => {
+                const dateA = getTimestampTime(a.createdAt);
+                const dateB = getTimestampTime(b.createdAt);
+                return dateB - dateA;
+            });
+
+            return orders;
         } catch (error) {
-            console.error('Erro ao buscar todos os pedidos:', error);
+            console.error("Erro ao buscar todos os pedidos:", error);
             return [];
         }
     },
@@ -152,13 +218,16 @@ export const cartService = {
      */
     async updateOrderStatus(orderId: string, newStatus: string): Promise<{ success: boolean; error?: string }> {
         try {
-            await updateDoc(doc(db, 'orders', orderId), {
+            const orderRef = doc(db, 'orders', orderId);
+
+            await updateDoc(orderRef, {
                 status: newStatus,
                 updatedAt: serverTimestamp(),
             });
+
             return { success: true };
         } catch (error: any) {
-            console.error('Erro ao atualizar status:', error);
+            console.error("Erro ao atualizar status:", error);
             return { success: false, error: error.message };
         }
     },
@@ -179,6 +248,127 @@ export const cartService = {
         } catch (error) {
             console.error('Erro ao buscar pedido:', error);
             return null;
+        }
+    },
+
+    /**
+     * 🔥 LISTENER EM TEMPO REAL - Buscar pedidos do usuário com atualizações automáticas
+     */
+    onUserOrders(
+        userId: string,
+        callback: (orders: Order[]) => void,
+        onError?: (error: Error) => void
+    ): Unsubscribe {
+        try {
+            const q = query(
+                collection(db, 'orders'),
+                where('userId', '==', userId)
+            );
+
+            return onSnapshot(q,
+                (snapshot) => {
+                    let orders = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+                        id: doc.id,
+                        ...doc.data() as Omit<Order, 'id'>,
+                    }));
+
+                    // Ordenar no cliente (mais recentes primeiro)
+                    orders.sort((a, b) => {
+                        const dateA = getTimestampTime(a.createdAt);
+                        const dateB = getTimestampTime(b.createdAt);
+                        return dateB - dateA;
+                    });
+
+                    callback(orders);
+                },
+                (error) => {
+                    console.error('Erro no listener de pedidos:', error);
+                    if (onError) onError(error);
+                }
+            );
+        } catch (error) {
+            console.error('Erro ao criar listener:', error);
+            if (onError) onError(error as Error);
+            return () => {};
+        }
+    },
+
+    /**
+     * 🔥 LISTENER EM TEMPO REAL - Buscar todos os pedidos (Admin)
+     */
+    onAllOrders(
+        callback: (orders: Order[]) => void,
+        statusFilter?: string,
+        onError?: (error: Error) => void
+    ): Unsubscribe {
+        try {
+            let constraints: any[] = [];
+
+            if (statusFilter && statusFilter !== "all") {
+                constraints.push(where('status', '==', statusFilter));
+            }
+
+            const q = query(collection(db, 'orders'), ...constraints);
+
+            return onSnapshot(q,
+                (snapshot) => {
+                    let orders = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+                        id: doc.id,
+                        ...doc.data() as Omit<Order, 'id'>,
+                    }));
+
+                    // Ordenar no cliente (mais recentes primeiro)
+                    orders.sort((a, b) => {
+                        const dateA = getTimestampTime(a.createdAt);
+                        const dateB = getTimestampTime(b.createdAt);
+                        return dateB - dateA;
+                    });
+
+                    callback(orders);
+                },
+                (error) => {
+                    console.error('Erro no listener de todos os pedidos:', error);
+                    if (onError) onError(error);
+                }
+            );
+        } catch (error) {
+            console.error('Erro ao criar listener:', error);
+            if (onError) onError(error as Error);
+            return () => {};
+        }
+    },
+
+    /**
+     * 🔥 LISTENER EM TEMPO REAL - Buscar pedido por ID
+     */
+    onOrderById(
+        orderId: string,
+        callback: (order: Order | null) => void,
+        onError?: (error: Error) => void
+    ): Unsubscribe {
+        try {
+            const orderRef = doc(db, 'orders', orderId);
+
+            return onSnapshot(orderRef,
+                (snapshot) => {
+                    if (snapshot.exists()) {
+                        callback({
+                            id: snapshot.id,
+                            ...snapshot.data() as Omit<Order, 'id'>,
+                        });
+                    } else {
+                        callback(null);
+                    }
+                },
+                (error) => {
+                    console.error('Erro no listener do pedido:', error);
+                    if (onError) onError(error);
+                }
+            );
+        } catch (error) {
+            console.error('Erro ao criar listener:', error);
+            if (onError) onError(error as Error);
+            return () => {};
         }
     }
 };

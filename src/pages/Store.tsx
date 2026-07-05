@@ -11,7 +11,7 @@ import { ShoppingBag } from 'lucide-react';
 
 const Store: React.FC = () => {
   const { user } = useAuth();
-  const { items, totalItems } = useCart();
+  const { totalItems } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
