@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where} from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Order } from '../../types';
 import { 
@@ -24,6 +24,24 @@ const Dashboard: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const formatDate = (value: unknown): string => {
+    const date = typeof (value as { toDate?: () => Date }).toDate === 'function'
+      ? (value as { toDate: () => Date }).toDate()
+      : value instanceof Date
+        ? value
+        : null;
+
+    if (!date) return '--';
+
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   useEffect(() => {
     const loadStats = async () => {
@@ -52,8 +70,18 @@ const Dashboard: React.FC = () => {
         // Últimos pedidos (ordenados por data)
         const recentOrders = [...orders]
           .sort((a, b) => {
-            const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-            const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+            const toMillis = (val: any) => {
+              if (!val) return 0;
+              // Firestore Timestamp has toDate(), JS Date has getTime()
+              if (typeof val.toDate === 'function') return val.toDate().getTime();
+              if (val instanceof Date) return val.getTime();
+              // fallback for numeric timestamps
+              if (typeof val === 'number') return val;
+              return 0;
+            };
+
+            const dateA = toMillis(a.createdAt);
+            const dateB = toMillis(b.createdAt);
             return dateB - dateA;
           })
           .slice(0, 5);
@@ -213,15 +241,7 @@ const Dashboard: React.FC = () => {
               </thead>
               <tbody>
                 {stats.recentOrders.map((order) => {
-                  const formattedDate = order.createdAt?.toDate 
-                    ? order.createdAt.toDate().toLocaleDateString('pt-BR', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-                    : '--';
+                  const formattedDate = formatDate(order.createdAt);
 
                   return (
                     <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
