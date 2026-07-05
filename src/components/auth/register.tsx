@@ -23,7 +23,6 @@ const Register: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
 
-  // Redirecionar se já estiver logado
   React.useEffect(() => {
     if (user) {
       navigate('/');
@@ -40,7 +39,6 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validações
     if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
@@ -105,7 +103,6 @@ const Register: React.FC = () => {
         </div>
 
         <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
-          {/* Nome */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
               Nome completo *
@@ -128,7 +125,6 @@ const Register: React.FC = () => {
             </div>
           </div>
 
-          {/* Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               Email *
@@ -151,7 +147,6 @@ const Register: React.FC = () => {
             </div>
           </div>
 
-          {/* Telefone */}
           <div>
             <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
               Telefone
@@ -173,7 +168,6 @@ const Register: React.FC = () => {
             </div>
           </div>
 
-          {/* Senha */}
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
               Senha *
@@ -207,7 +201,6 @@ const Register: React.FC = () => {
             </div>
           </div>
 
-          {/* Confirmar Senha */}
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
               Confirmar senha *
@@ -241,7 +234,6 @@ const Register: React.FC = () => {
             </div>
           </div>
 
-          {/* Endereço */}
           <div>
             <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
               Endereço
@@ -263,7 +255,6 @@ const Register: React.FC = () => {
             </div>
           </div>
 
-          {/* Cidade e Código Postal */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
@@ -297,7 +288,6 @@ const Register: React.FC = () => {
             </div>
           </div>
 
-          {/* Termos */}
           <div className="flex items-start">
             <div className="flex items-center h-5">
               <input

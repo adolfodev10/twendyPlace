@@ -32,8 +32,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const loadCart = async () => {
-      // Se tiver usuário e db configurado
-      if (user && db.getDoc) {
+      // Se tiver usuário
+      if (user) {
         try {
           const cartDoc = await getDoc(doc(db, 'carts', user.uid));
           if (cartDoc.exists()) {
@@ -64,7 +64,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const saveCart = async () => {
-      if (user && db.setDoc) {
+      if (user) {
         try {
           await setDoc(doc(db, 'carts', user.uid), {
             items,

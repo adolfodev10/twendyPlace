@@ -97,7 +97,7 @@ const Profile: React.FC = () => {
             />
             <button
               className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full shadow-lg hover:bg-primary-700 transition-colors"
-              onClick={() => toast.info('Upload de avatar em breve')}
+              onClick={() => toast('Upload de avatar em breve')}
             >
               <Camera className="h-4 w-4" />
             </button>

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/authService';
 import toast from 'react-hot-toast';
-import { LogIn, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Lock, ArrowRight } from 'lucide-react';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -13,7 +13,6 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
-  // Redirecionar se já estiver logado
   React.useEffect(() => {
     if (user) {
       if (user.role === 'admin') {
@@ -38,7 +37,6 @@ const Login: React.FC = () => {
       
       if (result.success) {
         toast.success('Login realizado com sucesso!');
-        // O redirecionamento será feito pelo useEffect
       } else {
         toast.error(result.error || 'Erro ao fazer login');
       }

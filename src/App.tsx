@@ -6,8 +6,8 @@ import { CartProvider } from './contexts/CartContext';
 // Pages
 import Store from './pages/Store';
 import AdminDashboard from './pages/AdminDashboard';
-import Login from './components/auth/login';
-import Register from './components/auth/register';
+import Login from './components/auth/Login';
+import Register from './components/auth/Register';
 import MyOrders from './pages/MyOrders';
 import OrderConfirmation from './pages/OrderConfirmation';
 import Profile from './pages/Profile';
