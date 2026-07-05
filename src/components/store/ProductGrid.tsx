@@ -1,7 +1,7 @@
 import React from 'react';
 import { Product } from '../../types';
 import { useCart } from '../../contexts/CartContext';
-import { ShoppingBag, ShoppingCart, Star } from 'lucide-react';
+import { ShoppingCart, Star, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface ProductGridProps {
@@ -24,49 +24,60 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
     return Array.from({ length: 5 }, (_, i) => (
       <Star
         key={i}
-        className={`w-4 h-4 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+        className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
+          i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+        }`}
       />
     ));
   };
 
   if (products.length === 0) {
     return (
-      <div className="text-center py-16 col-span-full">
-        <ShoppingBag className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-        <h3 className="text-xl font-semibold text-gray-900">Nenhum produto disponível</h3>
-        <p className="text-gray-500 mt-2">Volte em breve para ver nossas novidades</p>
+      <div className="text-center py-12 sm:py-16 col-span-full">
+        <Package className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+        <h3 className="text-lg font-semibold text-gray-900">Nenhum produto disponível</h3>
+        <p className="text-gray-500 mt-2 text-sm">Volte em breve para ver nossas novidades</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
       {products.map((product) => (
-        <div key={product.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
+        <div 
+          key={product.id} 
+          className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 group"
+        >
           <div className="relative aspect-square bg-gray-100 overflow-hidden">
             <img
               src={product.image}
               alt={product.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400';
+                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400/2563eb/ffffff?text=Product';
               }}
             />
+            {product.stock <= 3 && product.stock > 0 && (
+              <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-lg">
+                {product.stock} unidades
+              </div>
+            )}
             {product.stock <= 0 && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                <span className="bg-red-500 text-white px-4 py-2 rounded-full text-sm font-bold">
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                <span className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold">
                   Esgotado
                 </span>
               </div>
             )}
           </div>
 
-          <div className="p-4">
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <h3 className="font-semibold text-gray-900 line-clamp-2 flex-1">
+          <div className="p-3 sm:p-4">
+            <div className="flex items-start justify-between gap-2 mb-1.5">
+              <h3 className="font-semibold text-gray-900 text-sm sm:text-base line-clamp-2 flex-1">
                 {product.name}
               </h3>
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded whitespace-nowrap">
                 {product.brand}
               </span>
             </div>
@@ -78,21 +89,22 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
 
             <div className="flex items-center justify-between gap-2">
               <div>
-                <span className="text-xl font-bold text-primary-600">
+                <span className="text-base sm:text-lg font-bold text-primary-600">
                   Kz {product.price.toFixed(2)}
                 </span>
                 {product.stock > 0 && product.stock <= 3 && (
-                  <span className="block text-xs text-orange-500 font-medium">
-                    ⚡ Últimas {product.stock} unidades!
+                  <span className="block text-xs text-orange-500 font-medium mt-0.5">
+                    Últimas unidades!
                   </span>
                 )}
               </div>
               <button
                 onClick={() => handleAddToCart(product)}
                 disabled={product.stock <= 0}
-                className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-2 sm:p-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
+                aria-label="Adicionar ao carrinho"
               >
-                <ShoppingCart className="w-5 h-5" />
+                <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
           </div>

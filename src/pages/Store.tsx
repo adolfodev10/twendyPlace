@@ -7,7 +7,7 @@ import Header from '../components/common/Header';
 import ProductGrid from '../components/store/ProductGrid';
 import CartModal from '../components/store/CartModal';
 import Filters from '../components/store/Filters';
-import { ShoppingBag, AlertCircle } from 'lucide-react';
+import { ShoppingBag, AlertCircle, RefreshCw, FilterX, Package, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Store: React.FC = () => {
@@ -33,20 +33,12 @@ const Store: React.FC = () => {
       setError(null);
       
       try {
-        // Buscar produtos do Firebase
         const data = await productService.getAllProducts();
         
-        console.log('📦 Produtos carregados:', data);
-        console.log(`📊 Total: ${data.length} produtos disponíveis`);
-        
-        // 🔥 Remover duplicatas (mesmo nome) - opcional
+        // Remover duplicatas
         const uniqueProducts = data.filter((product, index, self) => 
           index === self.findIndex(p => p.name === product.name)
         );
-        
-        if (uniqueProducts.length < data.length) {
-          console.log(`🔄 Removidas ${data.length - uniqueProducts.length} duplicatas`);
-        }
         
         setProducts(uniqueProducts);
         setFilteredProducts(uniqueProducts);
@@ -55,7 +47,7 @@ const Store: React.FC = () => {
           setError('Nenhum produto disponível no momento.');
         }
       } catch (error) {
-        console.error('❌ Erro ao carregar produtos:', error);
+        console.error('Erro ao carregar produtos:', error);
         setError('Erro ao carregar produtos. Tente novamente mais tarde.');
         toast.error('Erro ao carregar produtos');
       } finally {
@@ -69,7 +61,6 @@ const Store: React.FC = () => {
   useEffect(() => {
     let filtered = [...products];
 
-    // Filtro de busca
     if (filters.search) {
       const search = filters.search.toLowerCase();
       filtered = filtered.filter(p =>
@@ -79,28 +70,38 @@ const Store: React.FC = () => {
       );
     }
 
-    // Filtro de categoria
     if (filters.category !== 'all') {
       filtered = filtered.filter(p => p.category === filters.category);
     }
 
-    // Filtro de preço
     filtered = filtered.filter(p =>
       p.price >= filters.minPrice && p.price <= filters.maxPrice
     );
 
-    // Filtro de avaliação
     if (filters.rating > 0) {
       filtered = filtered.filter(p => p.rating >= filters.rating);
     }
 
-    // Filtro de marcas
     if (filters.brands.length > 0) {
       filtered = filtered.filter(p => filters.brands.includes(p.brand));
     }
 
     setFilteredProducts(filtered);
   }, [products, filters]);
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      category: 'all',
+      minPrice: 0,
+      maxPrice: 10000,
+      rating: 0,
+      brands: [],
+    });
+  };
+
+  const hasActiveFilters = filters.search || filters.category !== 'all' || 
+    filters.brands.length > 0 || filters.rating > 0 || filters.maxPrice < 10000;
 
   if (loading) {
     return (
@@ -118,8 +119,8 @@ const Store: React.FC = () => {
         user={user}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-8">
           {/* Filters Sidebar */}
           <div className="lg:w-72 flex-shrink-0">
             <Filters
@@ -130,59 +131,66 @@ const Store: React.FC = () => {
           </div>
 
           {/* Product Grid */}
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             {error ? (
-              <div className="text-center py-16">
+              <div className="text-center py-12 sm:py-16">
                 <AlertCircle className="w-16 h-16 mx-auto text-red-400 mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900">Erro ao carregar produtos</h3>
-                <p className="text-gray-500 mt-2">{error}</p>
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Erro ao carregar produtos</h3>
+                <p className="text-gray-500 mt-2 text-sm sm:text-base">{error}</p>
                 <button
                   onClick={() => window.location.reload()}
-                  className="mt-4 px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                  className="mt-4 px-4 sm:px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors inline-flex items-center gap-2"
                 >
+                  <RefreshCw className="w-4 h-4" />
                   Tentar novamente
                 </button>
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-16">
+              <div className="text-center py-12 sm:py-16">
                 <ShoppingBag className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900">Nenhum produto encontrado</h3>
-                <p className="text-gray-500 mt-2">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Nenhum produto encontrado</h3>
+                <p className="text-gray-500 mt-2 text-sm sm:text-base">
                   {products.length === 0 
                     ? 'Não há produtos disponíveis no momento.' 
                     : 'Tente ajustar os filtros ou a pesquisa'}
                 </p>
-                {products.length > 0 && (
+                {hasActiveFilters && (
                   <button
-                    onClick={() => {
-                      setFilters({
-                        search: '',
-                        category: 'all',
-                        minPrice: 0,
-                        maxPrice: 10000,
-                        rating: 0,
-                        brands: [],
-                      });
-                    }}
-                    className="mt-4 px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                    onClick={clearFilters}
+                    className="mt-4 px-4 sm:px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors inline-flex items-center gap-2"
                   >
+                    <FilterX className="w-4 h-4" />
                     Limpar filtros
                   </button>
                 )}
               </div>
             ) : (
               <>
-                <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
-                  <p className="text-sm text-gray-500">
-                    Mostrando <span className="font-semibold text-gray-700">{filteredProducts.length}</span> de{' '}
-                    <span className="font-semibold text-gray-700">{products.length}</span> produtos disponíveis
+                {/* Stats Bar */}
+                <div className="flex flex-col sm:flex-row flex-wrap justify-between items-start sm:items-center gap-3 mb-4">
+                  <p className="text-sm text-gray-500 flex items-center gap-2">
+                    <Package className="w-4 h-4 text-gray-400" />
+                    Mostrando <span className="font-semibold text-gray-700 mx-1">{filteredProducts.length}</span> 
+                    de <span className="font-semibold text-gray-700 mx-1">{products.length}</span> produtos disponíveis
                   </p>
-                  <div className="flex gap-2">
-                    <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full">
-                      ✅ {products.length} produtos
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs bg-green-50 text-green-700 px-3 py-1 rounded-full border border-green-200">
+                      <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                      <span>{products.length} produtos</span>
                     </span>
+                    {hasActiveFilters && (
+                      <button
+                        onClick={clearFilters}
+                        className="inline-flex items-center gap-1.5 text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-200 transition-colors border border-gray-200"
+                      >
+                        <FilterX className="w-3.5 h-3.5" />
+                        Limpar filtros
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {/* Product Grid */}
                 <ProductGrid products={filteredProducts} />
               </>
             )}

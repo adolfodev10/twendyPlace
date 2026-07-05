@@ -1,10 +1,10 @@
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  getDoc, 
-  addDoc, 
-  updateDoc, 
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  addDoc,
+  updateDoc,
   deleteDoc,
   query,
   orderBy,
@@ -27,23 +27,21 @@ export const productService = {
         orderBy('name', 'asc')
       );
       const snapshot = await getDocs(q);
-      
+
       // Mapear todos os produtos
       const allProducts = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
         id: doc.id,
         ...doc.data() as Omit<Product, 'id'>,
       }));
-      
+
       // 🔥 FILTRAR APENAS PRODUTOS COM STOCK > 0
       const availableProducts = allProducts.filter(product => product.stock > 0);
-      
+
       // 🔥 REMOVER DUPLICATAS (mesmo nome)
-      const uniqueProducts = availableProducts.filter((product, index, self) => 
+      const uniqueProducts = availableProducts.filter((product, index, self) =>
         index === self.findIndex(p => p.name === product.name)
       );
-      
-      console.log(`📦 Total: ${allProducts.length} | Disponível: ${availableProducts.length} | Único: ${uniqueProducts.length}`);
-      
+
       return uniqueProducts;
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
@@ -139,7 +137,7 @@ export const productService = {
       // Filtrar por categoria e disponibilidade
       return products
         .filter(p => p.category === category && p.stock > 0)
-        .filter((product, index, self) => 
+        .filter((product, index, self) =>
           index === self.findIndex(p => p.name === product.name)
         );
     } catch (error) {
