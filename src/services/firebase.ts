@@ -1,31 +1,28 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-
-// import.meta.env may be untyped in some TS configs; cast to any to avoid
-// "Property 'env' does not exist on type 'ImportMeta'" errors.
-const _env = (import.meta as any).env || {};
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: _env.VITE_FIREBASE_API_KEY || 'demo-key',
-  authDomain: _env.VITE_FIREBASE_AUTH_DOMAIN || 'demo.firebaseapp.com',
-  projectId: _env.VITE_FIREBASE_PROJECT_ID || 'demo-project',
-  storageBucket: _env.VITE_FIREBASE_STORAGE_BUCKET || 'demo.appspot.com',
-  messagingSenderId: _env.VITE_FIREBASE_MESSAGING_SENDER_ID || '123456789',
-  appId: _env.VITE_FIREBASE_APP_ID || '1:123456789:web:abcdef',
+  apiKey: (import.meta as any).env.VITE_FIREBASE_API_KEY || '',
+  authDomain: (import.meta as any).env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: (import.meta as any).env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: (import.meta as any).env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: (import.meta as any).env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: (import.meta as any).env.VITE_FIREBASE_APP_ID || '',
 };
 
-// Inicializar Firebase apenas se tiver configurações válidas
+// Verificar se as configurações existem
 const isFirebaseConfigured = 
   firebaseConfig.apiKey && 
-  firebaseConfig.apiKey !== 'demo-key' &&
-  firebaseConfig.projectId !== 'demo-project';
+  firebaseConfig.apiKey !== '' &&
+  firebaseConfig.projectId && 
+  firebaseConfig.projectId !== '';
 
 let app;
-let auth;
-let db;
-let storage;
+let auth: Auth;
+let db: Firestore;
+let storage: FirebaseStorage;
 
 if (isFirebaseConfigured) {
   app = initializeApp(firebaseConfig);
@@ -33,11 +30,10 @@ if (isFirebaseConfigured) {
   db = getFirestore(app);
   storage = getStorage(app);
 } else {
-  console.warn('⚠️ Firebase não configurado. Use dados mock.');
-  // Criar objetos mock para evitar erros
-  auth = {} as any;
-  db = {} as any;
-  storage = {} as any;
+  console.warn('⚠️ Firebase não configurado. Configure as variáveis de ambiente.');
+  auth = {} as Auth;
+  db = {} as Firestore;
+  storage = {} as FirebaseStorage;
 }
 
 export { auth, db, storage };
