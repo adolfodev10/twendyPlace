@@ -7,7 +7,8 @@ import Header from '../components/common/Header';
 import ProductGrid from '../components/store/ProductGrid';
 import CartModal from '../components/store/CartModal';
 import Filters from '../components/store/Filters';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, AlertCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const Store: React.FC = () => {
   const { user } = useAuth();
@@ -15,6 +16,7 @@ const Store: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
@@ -27,93 +29,47 @@ const Store: React.FC = () => {
 
   useEffect(() => {
     const loadProducts = async () => {
+      setLoading(true);
+      setError(null);
+      
       try {
+        // Buscar produtos do Firebase
         const data = await productService.getAllProducts();
-        setProducts(data);
-        setFilteredProducts(data);
+        
+        console.log('📦 Produtos carregados:', data);
+        console.log(`📊 Total: ${data.length} produtos disponíveis`);
+        
+        // 🔥 Remover duplicatas (mesmo nome) - opcional
+        const uniqueProducts = data.filter((product, index, self) => 
+          index === self.findIndex(p => p.name === product.name)
+        );
+        
+        if (uniqueProducts.length < data.length) {
+          console.log(`🔄 Removidas ${data.length - uniqueProducts.length} duplicatas`);
+        }
+        
+        setProducts(uniqueProducts);
+        setFilteredProducts(uniqueProducts);
+        
+        if (uniqueProducts.length === 0) {
+          setError('Nenhum produto disponível no momento.');
+        }
       } catch (error) {
-        console.error('Erro ao carregar produtos:', error);
-        // Dados mock para fallback
-        const mockProducts: Product[] = [
-          {
-            id: '1',
-            name: 'Smartphone Pro 14',
-            price: 899.99,
-            stock: 10,
-            category: 'Mobile',
-            brand: 'TechBrand',
-            rating: 5,
-            image: 'https://images.unsplash.com/photo-1618972888345-125ccf0fee12?w=400',
-            description: 'Smartphone de última geração'
-          },
-          {
-            id: '2',
-            name: 'Fones Bluetooth Premium',
-            price: 149.99,
-            stock: 15,
-            category: 'Audio',
-            brand: 'SoundMax',
-            rating: 4,
-            image: 'https://images.unsplash.com/photo-1640300065113-738f2abb8ba6?w=400',
-            description: 'Fones com cancelamento de ruído'
-          },
-          {
-            id: '3',
-            name: 'Laptop Gaming Ultra',
-            price: 1299.99,
-            stock: 5,
-            category: 'Computers',
-            brand: 'GameTech',
-            rating: 5,
-            image: 'https://images.unsplash.com/photo-1677157561132-4f9e282a1684?w=400',
-            description: 'Laptop para gamers'
-          },
-          {
-            id: '4',
-            name: 'Smartwatch Fitness Pro',
-            price: 349.99,
-            stock: 8,
-            category: 'Wearables',
-            brand: 'FitTech',
-            rating: 4,
-            image: 'https://images.unsplash.com/photo-1665860455418-017fa50d29bc?w=400',
-            description: 'Smartwatch com monitor cardíaco'
-          },
-          {
-            id: '5',
-            name: 'Câmera Digital 4K',
-            price: 1899.99,
-            stock: 3,
-            category: 'Cameras',
-            brand: 'PhotoPro',
-            rating: 5,
-            image: 'https://images.unsplash.com/photo-1532272278764-53cd1fe53f72?w=400',
-            description: 'Câmera profissional 4K'
-          },
-          {
-            id: '6',
-            name: 'Tablet Pro 11',
-            price: 649.99,
-            stock: 7,
-            category: 'Computers',
-            brand: 'TechBrand',
-            rating: 4,
-            image: 'https://images.unsplash.com/photo-1740637977676-c8040b41dc7a?w=400',
-            description: 'Tablet de alta performance'
-          },
-        ];
-        setProducts(mockProducts);
-        setFilteredProducts(mockProducts);
+        console.error('❌ Erro ao carregar produtos:', error);
+        setError('Erro ao carregar produtos. Tente novamente mais tarde.');
+        toast.error('Erro ao carregar produtos');
       } finally {
         setLoading(false);
       }
     };
+    
     loadProducts();
   }, []);
 
   useEffect(() => {
     let filtered = [...products];
 
+    // Filtro de busca
     if (filters.search) {
       const search = filters.search.toLowerCase();
       filtered = filtered.filter(p =>
@@ -123,18 +79,22 @@ const Store: React.FC = () => {
       );
     }
 
+    // Filtro de categoria
     if (filters.category !== 'all') {
       filtered = filtered.filter(p => p.category === filters.category);
     }
 
+    // Filtro de preço
     filtered = filtered.filter(p =>
       p.price >= filters.minPrice && p.price <= filters.maxPrice
     );
 
+    // Filtro de avaliação
     if (filters.rating > 0) {
       filtered = filtered.filter(p => p.rating >= filters.rating);
     }
 
+    // Filtro de marcas
     if (filters.brands.length > 0) {
       filtered = filtered.filter(p => filters.brands.includes(p.brand));
     }
@@ -171,14 +131,60 @@ const Store: React.FC = () => {
 
           {/* Product Grid */}
           <div className="flex-1">
-            {filteredProducts.length === 0 ? (
+            {error ? (
+              <div className="text-center py-16">
+                <AlertCircle className="w-16 h-16 mx-auto text-red-400 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900">Erro ao carregar produtos</h3>
+                <p className="text-gray-500 mt-2">{error}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-4 px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            ) : filteredProducts.length === 0 ? (
               <div className="text-center py-16">
                 <ShoppingBag className="w-16 h-16 mx-auto text-gray-300 mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900">Nenhum produto encontrado</h3>
-                <p className="text-gray-500 mt-2">Tente ajustar os filtros ou a pesquisa</p>
+                <p className="text-gray-500 mt-2">
+                  {products.length === 0 
+                    ? 'Não há produtos disponíveis no momento.' 
+                    : 'Tente ajustar os filtros ou a pesquisa'}
+                </p>
+                {products.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setFilters({
+                        search: '',
+                        category: 'all',
+                        minPrice: 0,
+                        maxPrice: 10000,
+                        rating: 0,
+                        brands: [],
+                      });
+                    }}
+                    className="mt-4 px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Limpar filtros
+                  </button>
+                )}
               </div>
             ) : (
-              <ProductGrid products={filteredProducts} />
+              <>
+                <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
+                  <p className="text-sm text-gray-500">
+                    Mostrando <span className="font-semibold text-gray-700">{filteredProducts.length}</span> de{' '}
+                    <span className="font-semibold text-gray-700">{products.length}</span> produtos disponíveis
+                  </p>
+                  <div className="flex gap-2">
+                    <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full">
+                      ✅ {products.length} produtos
+                    </span>
+                  </div>
+                </div>
+                <ProductGrid products={filteredProducts} />
+              </>
             )}
           </div>
         </div>

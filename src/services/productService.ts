@@ -8,27 +8,43 @@ import {
   deleteDoc,
   query,
   orderBy,
-  where,
   serverTimestamp,
   DocumentData,
-  QueryDocumentSnapshot,
-  onSnapshot
+  QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Product } from '../types';
 
 export const productService = {
   /**
-   * Buscar todos os produtos
+   * Buscar todos os produtos disponíveis (stock > 0)
    */
   async getAllProducts(): Promise<Product[]> {
     try {
-      const q = query(collection(db, 'products'), orderBy('name', 'asc'));
+      // Buscar todos os produtos ordenados por nome
+      const q = query(
+        collection(db, 'products'),
+        orderBy('name', 'asc')
+      );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+      
+      // Mapear todos os produtos
+      const allProducts = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
         id: doc.id,
         ...doc.data() as Omit<Product, 'id'>,
       }));
+      
+      // 🔥 FILTRAR APENAS PRODUTOS COM STOCK > 0
+      const availableProducts = allProducts.filter(product => product.stock > 0);
+      
+      // 🔥 REMOVER DUPLICATAS (mesmo nome)
+      const uniqueProducts = availableProducts.filter((product, index, self) => 
+        index === self.findIndex(p => p.name === product.name)
+      );
+      
+      console.log(`📦 Total: ${allProducts.length} | Disponível: ${availableProducts.length} | Único: ${uniqueProducts.length}`);
+      
+      return uniqueProducts;
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
       return [];
@@ -43,36 +59,20 @@ export const productService = {
       const docRef = doc(db, 'products', id);
       const snapshot = await getDoc(docRef);
       if (snapshot.exists()) {
-        return {
+        const product = {
           id: snapshot.id,
           ...snapshot.data() as Omit<Product, 'id'>,
         };
+        // Verificar se está disponível
+        if (product.stock <= 0) {
+          return null;
+        }
+        return product;
       }
       return null;
     } catch (error) {
       console.error('Erro ao buscar produto:', error);
       return null;
-    }
-  },
-
-  /**
-   * Buscar produtos por categoria
-   */
-  async getProductsByCategory(category: string): Promise<Product[]> {
-    try {
-      const q = query(
-        collection(db, 'products'), 
-        where('category', '==', category),
-        orderBy('name', 'asc')
-      );
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-        id: doc.id,
-        ...doc.data() as Omit<Product, 'id'>,
-      }));
-    } catch (error) {
-      console.error('Erro ao buscar produtos por categoria:', error);
-      return [];
     }
   },
 
@@ -123,79 +123,27 @@ export const productService = {
   },
 
   /**
-   * Buscar produtos em tempo real (com listener)
+   * Buscar produtos por categoria
    */
-  onProductsSnapshot(callback: (products: Product[]) => void): () => void {
-    const q = query(collection(db, 'products'), orderBy('name', 'asc'));
-    return onSnapshot(q, (snapshot) => {
+  async getProductsByCategory(category: string): Promise<Product[]> {
+    try {
+      const q = query(
+        collection(db, 'products'),
+        orderBy('name', 'asc')
+      );
+      const snapshot = await getDocs(q);
       const products = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
         id: doc.id,
         ...doc.data() as Omit<Product, 'id'>,
       }));
-      callback(products);
-    });
-  },
-
-  /**
-   * Buscar produtos com filtros
-   */
-  async getProductsWithFilters(filters: {
-    search?: string;
-    category?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    brand?: string;
-    minRating?: number;
-  }): Promise<Product[]> {
-    try {
-      const constraints = [];
-      
-      // Aplicar filtros
-      if (filters.category && filters.category !== 'all') {
-        constraints.push(where('category', '==', filters.category));
-      }
-      
-      if (filters.brand) {
-        constraints.push(where('brand', '==', filters.brand));
-      }
-
-      // Ordenar por nome
-      constraints.push(orderBy('name', 'asc'));
-      
-      const q = query(collection(db, 'products'), ...constraints);
-      
-      const snapshot = await getDocs(q);
-      let products = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-        id: doc.id,
-        ...doc.data() as Omit<Product, 'id'>,
-      }));
-
-      // Filtrar por preço (client-side)
-      if (filters.minPrice !== undefined) {
-        products = products.filter(p => p.price >= filters.minPrice!);
-      }
-      if (filters.maxPrice !== undefined) {
-        products = products.filter(p => p.price <= filters.maxPrice!);
-      }
-
-      // Filtrar por avaliação (client-side)
-      if (filters.minRating !== undefined && filters.minRating > 0) {
-        products = products.filter(p => p.rating >= filters.minRating!);
-      }
-
-      // Filtrar por busca (client-side)
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        products = products.filter(p => 
-          p.name.toLowerCase().includes(searchLower) ||
-          p.brand.toLowerCase().includes(searchLower) ||
-          p.category.toLowerCase().includes(searchLower)
+      // Filtrar por categoria e disponibilidade
+      return products
+        .filter(p => p.category === category && p.stock > 0)
+        .filter((product, index, self) => 
+          index === self.findIndex(p => p.name === product.name)
         );
-      }
-
-      return products;
     } catch (error) {
-      console.error('Erro ao buscar produtos com filtros:', error);
+      console.error('Erro ao buscar produtos por categoria:', error);
       return [];
     }
   }

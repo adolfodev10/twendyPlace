@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Order } from '../types';
-import { db } from '../services/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { CheckCircle, Package, Truck, Clock, ArrowLeft, Home } from 'lucide-react';
+import { cartService } from '../services/cartService';
+import { CheckCircle, Package, Truck, Clock, ArrowLeft, Home, Bell } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const OrderConfirmation: React.FC = () => {
@@ -15,40 +14,61 @@ const OrderConfirmation: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadOrder = async () => {
-      if (!orderId) {
-        navigate('/');
-        return;
-      }
+    if (!orderId) {
+      navigate('/');
+      return;
+    }
 
-      try {
-        const orderDoc = await getDoc(doc(db, 'orders', orderId));
-        if (orderDoc.exists()) {
-          const data = orderDoc.data() as Omit<Order, 'id'>;
-          
-          if (user && data.userId !== user.uid) {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    setLoading(true);
+
+    // 🔥 LISTENER EM TEMPO REAL para o pedido
+    const unsubscribe = cartService.onOrderById(
+      orderId,
+      (updatedOrder) => {
+        if (updatedOrder) {
+          // Verificar se o pedido pertence ao usuário
+          if (updatedOrder.userId !== user.uid) {
             toast.error('Este pedido não pertence à sua conta');
             navigate('/');
             return;
           }
-
-          setOrder({
-            id: orderDoc.id,
-            ...data,
-          });
+          setOrder(updatedOrder);
+          setLoading(false);
+          
+          // Mostrar notificação se o status mudou
+          if (order && order.status !== updatedOrder.status) {
+            const statusLabels: Record<string, string> = {
+              awaiting_payment: 'Aguardando Pagamento',
+              paid: 'Pago ✅',
+              processing: 'Processando 🔄',
+              shipped: 'Enviado 🚚',
+              delivered: 'Entregue 📦',
+              cancelled: 'Cancelado ❌',
+            };
+            toast(
+              `Status do pedido atualizado: ${statusLabels[updatedOrder.status] || updatedOrder.status}`,
+              { duration: 5000, icon: '🔄' }
+            );
+          }
         } else {
           toast.error('Pedido não encontrado');
           navigate('/');
         }
-      } catch (error) {
-        console.error('Erro ao carregar pedido:', error);
+      },
+      (error) => {
+        console.error('Erro no listener:', error);
         toast.error('Erro ao carregar pedido');
-      } finally {
         setLoading(false);
       }
-    };
+    );
 
-    loadOrder();
+    // Limpar listener ao desmontar
+    return () => unsubscribe();
   }, [orderId, user, navigate]);
 
   const getStatusIcon = (status: string) => {
@@ -63,8 +83,29 @@ const OrderConfirmation: React.FC = () => {
         return <Truck className="h-6 w-6 text-cyan-500" />;
       case 'delivered':
         return <CheckCircle className="h-6 w-6 text-green-500" />;
+      case 'cancelled':
+        return <Package className="h-6 w-6 text-red-500" />;
       default:
         return <Package className="h-6 w-6 text-gray-500" />;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'awaiting_payment':
+        return 'text-yellow-600 bg-yellow-50';
+      case 'paid':
+        return 'text-blue-600 bg-blue-50';
+      case 'processing':
+        return 'text-purple-600 bg-purple-50';
+      case 'shipped':
+        return 'text-cyan-600 bg-cyan-50';
+      case 'delivered':
+        return 'text-green-600 bg-green-50';
+      case 'cancelled':
+        return 'text-red-600 bg-red-50';
+      default:
+        return 'text-gray-600 bg-gray-50';
     }
   };
 
@@ -80,8 +121,48 @@ const OrderConfirmation: React.FC = () => {
         return 'Enviado';
       case 'delivered':
         return 'Entregue';
+      case 'cancelled':
+        return 'Cancelado';
       default:
         return status;
+    }
+  };
+
+  // Formatar data com fallback
+  const formatDate = (date: any) => {
+    if (!date) return 'Data não disponível';
+    try {
+      if (date.toDate) {
+        return date.toDate().toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+      if (date.seconds) {
+        return new Date(date.seconds * 1000).toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+      const d = new Date(date);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+      return 'Data não disponível';
+    } catch {
+      return 'Data não disponível';
     }
   };
 
@@ -118,21 +199,21 @@ const OrderConfirmation: React.FC = () => {
             <div>
               <h1 className="text-xl font-bold text-gray-900">Pedido Confirmado!</h1>
               <p className="text-sm text-gray-500">
-                Pedido #{order.orderNumber} - {new Date(order.createdAt).toLocaleDateString('pt-BR', {
-                  day: '2-digit',
-                  month: 'long',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                Pedido #{order.orderNumber} - {formatDate(order.createdAt)}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {getStatusIcon(order.status)}
-            <span className={`font-medium ${order.status === 'cancelled' ? 'text-red-600' : 'text-gray-900'}`}>
-              Status: {getStatusLabel(order.status)}
-            </span>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              {getStatusIcon(order.status)}
+              <span className={`font-medium px-3 py-1 rounded-full text-sm ${getStatusColor(order.status)}`}>
+                Status: {getStatusLabel(order.status)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-gray-400">
+              <Bell className="h-3 w-3" />
+              <span>Atualizações em tempo real</span>
+            </div>
           </div>
         </div>
 
@@ -179,6 +260,9 @@ const OrderConfirmation: React.FC = () => {
               <p className="text-sm text-gray-600">
                 <span className="font-medium">Endereço de entrega:</span>{' '}
                 {order.customer.address}, {order.customer.city}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                <span className="font-medium">Cliente:</span> {order.customer.name}
               </p>
             </div>
           )}
