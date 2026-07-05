@@ -23,6 +23,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Verificar se auth está configurado
+    if (!auth.onAuthStateChanged) {
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       setLoading(true);
       
@@ -52,7 +58,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const logout = async () => {
-    await auth.signOut();
+    if (auth.signOut) {
+      await auth.signOut();
+    }
     setUser(null);
   };
 

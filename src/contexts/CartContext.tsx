@@ -32,7 +32,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const loadCart = async () => {
-      if (user) {
+      // Se tiver usuário e db configurado
+      if (user && db.getDoc) {
         try {
           const cartDoc = await getDoc(doc(db, 'carts', user.uid));
           if (cartDoc.exists()) {
@@ -47,6 +48,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
+      // Fallback para localStorage
       const saved = localStorage.getItem('guestCart');
       if (saved) {
         try {
@@ -62,7 +64,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const saveCart = async () => {
-      if (user) {
+      if (user && db.setDoc) {
         try {
           await setDoc(doc(db, 'carts', user.uid), {
             items,
@@ -75,7 +77,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('guestCart', JSON.stringify(items));
     };
 
-    saveCart();
+    if (items.length > 0 || user) {
+      saveCart();
+    }
   }, [items, user]);
 
   const addItem = (product: Product) => {

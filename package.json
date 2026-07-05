@@ -1,41 +1,29 @@
 {
   "name": "twendyplace",
   "version": "1.0.0",
-  "description": "MarketPlace da TwendyCreate",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
-    "dev":"vite",
-    "build":"tsc && vite build",
-    "preview":"vite preview"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/adolfodev10/twendyPlace.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/adolfodev10/twendyPlace/issues"
-  },
-  "homepage": "https://github.com/adolfodev10/twendyPlace#readme",
   "dependencies": {
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "firebase": "^12.15.0",
-    "lucide-react": "^1.23.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-hot-toast": "^2.6.0",
-    "react-router-dom": "^7.18.1",
-    "recharts": "^3.9.2",
-    "typescript": "^6.0.3"
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "firebase": "^10.14.0",
+    "lucide-react": "^0.294.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.4.1",
+    "react-router-dom": "^6.20.0",
+    "recharts": "^2.8.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.7.0",
-    "autoprefixer": "^10.5.2",
-    "postcss": "^8.5.16",
-    "tailwindcss": "^4.3.2",
-    "vite": "^6.4.3"
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8"
   }
 }
