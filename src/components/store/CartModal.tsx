@@ -235,7 +235,7 @@ const PaymentInfoModal: React.FC<{
 const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
   const { items, removeItem, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
   const { user } = useAuth();
-
+  
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -256,7 +256,6 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     setShowConfirmModal(true);
   };
 
-  // No handleConfirmOrder do CartModal.tsx
   const handleConfirmOrder = async () => {
     setLoading(true);
     try {
@@ -298,7 +297,7 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     <>
       <div className="fixed inset-0 z-50 overflow-hidden">
         <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-
+        
         <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl">
           <div className="flex h-full flex-col">
             {/* Header */}
