@@ -1,7 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AdminLayout from '../components/admin/AdminLayout';
-import Dashboard from '../components/admin/Dashboard';
 import OrdersManager from '../components/admin/OrdersManager';
 import ProductsManager from '../components/admin/ProductsManager';
 import ClientsManager from '../components/admin/ClientsManager';
@@ -12,7 +11,7 @@ const AdminDashboard: React.FC = () => {
     <ProtectedRoute requireAdmin>
       <AdminLayout>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<AdminDashboard />} />
           <Route path="/orders" element={<OrdersManager />} />
           <Route path="/products" element={<ProductsManager />} />
           <Route path="/clients" element={<ClientsManager />} />
