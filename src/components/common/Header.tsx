@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, User, LogOut, LayoutDashboard, Menu, X } from 'lucide-react';
+import { ShoppingCart, LogOut, LayoutDashboard, Menu, X } from 'lucide-react';
 import { User as UserType } from '../../types';
 import { authService } from '../../services/authService';
 import toast from 'react-hot-toast';
@@ -73,14 +73,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
 
                 {isUserDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                    <Link
-                      to="/profile"
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setIsUserDropdownOpen(false)}
-                    >
-                      <User className="w-4 h-4" />
-                      Perfil
-                    </Link>
+
                     <Link
                       to="/my-orders"
                       className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -145,14 +138,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
 
               {user ? (
                 <>
-                  <Link
-                    to="/profile"
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <User className="w-4 h-4" />
-                    Perfil
-                  </Link>
+
                   <Link
                     to="/my-orders"
                     className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg"
