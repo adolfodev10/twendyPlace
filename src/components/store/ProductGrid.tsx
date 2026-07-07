@@ -1,8 +1,9 @@
 import React from 'react';
 import { Product } from '../../types';
 import { useCart } from '../../contexts/CartContext';
-import { ShoppingCart, Star, Package } from 'lucide-react';
+import { ShoppingCart, Star, Package, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ProductGridProps {
   products: Product[];
@@ -10,8 +11,18 @@ interface ProductGridProps {
 
 const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
   const { addItem } = useCart();
+  const { user } = useAuth();
+
+  const isAdmin = user?.role === 'admin';
+
+  console.log('User in ProductGrid:', user);
 
   const handleAddToCart = (product: Product) => {
+
+    if (isAdmin) {
+      toast.error('Não podes adicionar produtos ao carrinho.');
+      return;
+    }
     if (product.stock <= 0) {
       toast.error('Produto esgotado!');
       return;
@@ -24,9 +35,8 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
     return Array.from({ length: 5 }, (_, i) => (
       <Star
         key={i}
-        className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
-          i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-        }`}
+        className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+          }`}
       />
     ));
   };
@@ -44,10 +54,16 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
       {products.map((product) => (
-        <div 
-          key={product.id} 
+        <div
+          key={product.id}
           className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 group"
         >
+          {isAdmin && (
+            <div className="absolute top-2 right-2 z-10 bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1 shadow-lg">
+              <Shield className='size-3' />
+              Admin
+            </div>
+          )}
           <div className="relative aspect-square bg-gray-100 overflow-hidden">
             <img
               src={product.image}
