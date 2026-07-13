@@ -5,22 +5,27 @@ class NotificationService {
   private isSoundEnabled = true;
   private isInitialized = false;
   private pendingSounds: Array<{type: 'notification' | 'success' | 'error'}> = [];
+  private isMobile = false;
 
   constructor() {
-    // Não inicializar automaticamente - esperar interação do usuário
+    // Detectar se é mobile
+    this.isMobile = /Android|iPhone|iPad|iPod|BlackBerry|Opera Mini|IEMobile/i.test(navigator.userAgent);
+    console.log(`📱 Dispositivo: ${this.isMobile ? 'Mobile' : 'Desktop'}`);
+    
     this.setupUserInteraction();
   }
 
   private setupUserInteraction() {
-    // Inicializar AudioContext apenas após interação do usuário
     const init = () => {
       if (!this.audioContext && !this.isInitialized) {
         try {
           this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
           this.isInitialized = true;
+          console.log('🔊 AudioContext inicializado');
           
           // Tocar sons pendentes
           if (this.pendingSounds.length > 0) {
+            console.log(`🔊 Tocando ${this.pendingSounds.length} sons pendentes`);
             this.pendingSounds.forEach(sound => {
               this.playSound(sound.type);
             });
@@ -32,11 +37,10 @@ class NotificationService {
       }
     };
 
-    // Tentar inicializar em vários eventos de interação
-    const events = ['click', 'touchstart', 'keydown', 'scroll', 'mousemove'];
+    // Múltiplos eventos para garantir interação do usuário
+    const events = ['click', 'touchstart', 'keydown', 'scroll', 'mousemove', 'pointerdown'];
     const initOnce = () => {
       init();
-      // Remover listeners após inicializar
       events.forEach(event => {
         document.removeEventListener(event, initOnce);
       });
@@ -46,27 +50,43 @@ class NotificationService {
       document.addEventListener(event, initOnce, { once: true });
     });
 
-    // Se já houve interação, inicializar imediatamente
-    if (document.readyState === 'complete') {
-      // Verificar se já houve interação com a página
-      try {
-        // Tentar criar um AudioContext (pode ser bloqueado)
-        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        if (this.audioContext.state === 'running') {
-          this.isInitialized = true;
-        } else {
-          // Se estiver suspenso, esperar interação
-          }
-      } catch (e) {
-        // Ignorar erro, aguardar interação
+    // Tentar inicializar imediatamente (pode funcionar em alguns navegadores)
+    try {
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (this.audioContext.state === 'running') {
+        this.isInitialized = true;
+        console.log('🔊 AudioContext inicializado (já ativo)');
+      } else if (this.audioContext.state === 'suspended') {
+        // No mobile, o AudioContext geralmente começa suspenso
+        console.log('⏸️ AudioContext suspenso, aguardando interação');
+        // Tenta resumir automaticamente (pode funcionar em alguns casos)
+        if (!this.isMobile) {
+          this.audioContext.resume().then(() => {
+            console.log('▶️ AudioContext resumido automaticamente');
+            this.isInitialized = true;
+          }).catch(() => {});
+        }
       }
+    } catch (e) {
+      // Ignorar erro, aguardar interação
     }
   }
 
-  // 🔥 FORÇAR INICIALIZAÇÃO (chamar no clique do usuário)
   public ensureAudioContext() {
     if (this.audioContext && this.audioContext.state === 'suspended') {
-      this.audioContext.resume();
+      this.audioContext.resume().then(() => {
+        console.log('▶️ AudioContext resumido');
+        this.isInitialized = true;
+        // Tocar sons pendentes
+        if (this.pendingSounds.length > 0) {
+          this.pendingSounds.forEach(sound => {
+            this.playSound(sound.type);
+          });
+          this.pendingSounds = [];
+        }
+      }).catch(() => {
+        console.log('❌ Não foi possível resumir AudioContext');
+      });
       return;
     }
 
@@ -74,6 +94,7 @@ class NotificationService {
       try {
         this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         this.isInitialized = true;
+        console.log('🔊 AudioContext inicializado (forçado)');
       } catch (e) {
         console.warn('Não foi possível inicializar AudioContext');
       }
@@ -82,30 +103,39 @@ class NotificationService {
 
   private playSound(type: 'notification' | 'success' | 'error') {
     if (!this.isSoundEnabled) {
+      console.log('🔇 Som desativado');
       return;
     }
 
-    // Se não estiver inicializado, armazenar para tocar depois
+    // No mobile, tentar usar vibrate como fallback
+    if (this.isMobile && navigator.vibrate) {
+      try {
+        navigator.vibrate([100, 50, 100]);
+        console.log('📳 Vibração ativada (mobile)');
+      } catch (e) {
+        // Ignorar erro de vibração
+      }
+    }
+
     if (!this.audioContext || !this.isInitialized) {
+      console.log(`📌 Armazenando som "${type}" para tocar depois`);
       this.pendingSounds.push({ type });
-      // Tentar inicializar
       this.ensureAudioContext();
       return;
     }
 
-    // Se o AudioContext estiver suspenso, tentar resumir
     if (this.audioContext.state === 'suspended') {
+      console.log('⏸️ AudioContext suspenso, tentando resumir...');
       this.audioContext.resume().then(() => {
-        // Tocar o som após resumir
+        console.log('▶️ AudioContext resumido');
         this.playSoundInternal(type);
       }).catch(() => {
-        // Armazenar para tocar depois
+        console.log('❌ Não foi possível resumir AudioContext');
         this.pendingSounds.push({ type });
       });
       return;
     }
 
-    // Tocar o som imediatamente
     this.playSoundInternal(type);
   }
 
@@ -114,20 +144,24 @@ class NotificationService {
 
     try {
       const now = this.audioContext.currentTime;
+      console.log(`🔊 Tocando som: ${type}`);
+      
+      // No mobile, usar tons mais altos e curtos
+      const isMobile = this.isMobile;
       
       switch (type) {
         case 'notification':
-          this.playTone(800, 0.08, now);
-          this.playTone(1000, 0.08, now + 0.12);
+          this.playTone(isMobile ? 1000 : 800, isMobile ? 0.06 : 0.08, now);
+          this.playTone(isMobile ? 1200 : 1000, isMobile ? 0.06 : 0.08, now + (isMobile ? 0.08 : 0.12));
           break;
         case 'success':
-          this.playTone(600, 0.1, now);
-          this.playTone(800, 0.1, now + 0.1);
-          this.playTone(1000, 0.15, now + 0.2);
+          this.playTone(isMobile ? 700 : 600, isMobile ? 0.08 : 0.1, now);
+          this.playTone(isMobile ? 900 : 800, isMobile ? 0.08 : 0.1, now + (isMobile ? 0.08 : 0.1));
+          this.playTone(isMobile ? 1100 : 1000, isMobile ? 0.12 : 0.15, now + (isMobile ? 0.16 : 0.2));
           break;
         case 'error':
-          this.playTone(400, 0.2, now);
-          this.playTone(300, 0.3, now + 0.15);
+          this.playTone(isMobile ? 500 : 400, isMobile ? 0.15 : 0.2, now);
+          this.playTone(isMobile ? 400 : 300, isMobile ? 0.2 : 0.3, now + (isMobile ? 0.12 : 0.15));
           break;
         default:
           this.playTone(700, 0.15, now);
@@ -150,8 +184,11 @@ class NotificationService {
       oscillator.frequency.value = frequency;
       oscillator.type = 'sine';
       
+      // No mobile, aumentar o volume um pouco
+      const maxVolume = this.isMobile ? 0.4 : 0.3;
+      
       gainNode.gain.setValueAtTime(0.01, startTime);
-      gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
+      gainNode.gain.linearRampToValueAtTime(maxVolume, startTime + 0.01);
       gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
       
       oscillator.start(startTime);
@@ -161,9 +198,6 @@ class NotificationService {
     }
   }
 
-  /**
-   * Mostrar notificação com som
-   */
   showNotification(
     message: string,
     options?: {
@@ -182,9 +216,7 @@ class NotificationService {
       sound = true,
     } = options || {};
 
-    // 🔥 GARANTIR QUE O AUDIO CONTEXT ESTÁ INICIALIZADO
     if (sound) {
-      this.ensureAudioContext();
       const soundType = type === 'success' ? 'success' : 
                        type === 'error' ? 'error' : 'notification';
       this.playSound(soundType);
@@ -209,7 +241,6 @@ class NotificationService {
       toastOptions.onClick = onClick;
     }
 
-    // Mostrar toast com o tipo correto
     switch (type) {
       case 'success':
         toast.success(message, toastOptions);
@@ -259,24 +290,22 @@ class NotificationService {
         toast(message, toastOptions);
     }
 
-    // Notificação do navegador
     this.sendBrowserNotification(message, { icon, onClick });
   }
 
-  /**
-   * Enviar notificação do navegador
-   */
   private sendBrowserNotification(message: string, options?: { 
     icon?: string; 
     onClick?: () => void;
   }) {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'denied') {
+      console.log('📢 Notificações bloqueadas pelo usuário');
       return;
     }
 
     if (Notification.permission === 'default') {
       Notification.requestPermission().then(permission => {
+        console.log('📢 Permissão de notificação:', permission);
         if (permission === 'granted') {
           this.sendBrowserNotification(message, options);
         }
@@ -302,30 +331,35 @@ class NotificationService {
         }
       };
       
+      console.log('📢 Notificação enviada:', message);
     } catch (error) {
       console.debug('Erro ao enviar notificação:', error);
     }
   }
 
-  /**
-   * Ativar/desativar som
-   */
   toggleSound(enabled: boolean) {
     this.isSoundEnabled = enabled;
+    console.log(`🔊 Som ${enabled ? 'ativado' : 'desativado'}`);
+    // Se estiver desativando, parar sons pendentes
+    if (!enabled) {
+      this.pendingSounds = [];
+    }
   }
 
-  /**
-   * Verificar se o som está ativado
-   */
   isSoundOn(): boolean {
     return this.isSoundEnabled;
   }
 
-  /**
-   * Testar som (para debug)
-   */
   testSound() {
+    console.log('🔊 Testando sons...');
+    // Tentar garantir que o AudioContext está ativo
     this.ensureAudioContext();
+    
+    // No mobile, usar vibração como feedback
+    if (this.isMobile && navigator.vibrate) {
+      navigator.vibrate([100, 50, 100, 50, 100]);
+    }
+    
     this.playSound('notification');
     setTimeout(() => {
       this.playSound('success');
@@ -334,14 +368,16 @@ class NotificationService {
       this.playSound('error');
     }, 700);
     setTimeout(() => {
+      console.log('✅ Teste de som concluído');
+      if (this.isMobile) {
+        toast.success('📱 Modo mobile detectado - verifique o volume do dispositivo');
+      }
     }, 1000);
   }
 }
 
-// Exportar instância única
 export const notificationService = new NotificationService();
 
-// Funções para usar no console
 export const testNotificationSound = () => {
   notificationService.testSound();
 };

@@ -13,9 +13,37 @@ import {
   ArrowLeft, 
   Bell,
   Volume2,
-  VolumeX
+  VolumeX,
+  ShoppingBag,
+  RefreshCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+// 🔥 Componente de Skeleton Loading
+const OrderSkeleton: React.FC = () => {
+    return (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex-1">
+                    <div className="h-5 bg-gray-200 rounded w-32 mb-2" />
+                    <div className="h-4 bg-gray-200 rounded w-48" />
+                </div>
+                <div className="text-right">
+                    <div className="h-6 bg-gray-200 rounded w-24 mb-1" />
+                    <div className="h-4 bg-gray-200 rounded w-16" />
+                </div>
+            </div>
+            <div className="mt-4 flex gap-2">
+                {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-12 w-12 bg-gray-200 rounded-lg" />
+                ))}
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="h-4 bg-gray-200 rounded w-48" />
+            </div>
+        </div>
+    );
+};
 
 const MyOrders: React.FC = () => {
     const { user } = useAuth();
@@ -25,8 +53,8 @@ const MyOrders: React.FC = () => {
     const [notificationCount, setNotificationCount] = useState(0);
     const [soundEnabled, setSoundEnabled] = useState(true);
     const [unreadNotifications, setUnreadNotifications] = useState<string[]>([]);
+    const [statusFilter, setStatusFilter] = useState<string>('all');
     
-    // 🔥 USAR REF PARA MANTER O ESTADO ANTERIOR
     const previousOrdersRef = useRef<Order[]>([]);
     const isFirstLoadRef = useRef<boolean>(true);
 
@@ -41,15 +69,12 @@ const MyOrders: React.FC = () => {
         const unsubscribe = cartService.onUserOrders(
             user.uid,
             (updatedOrders) => {
-                
                 const statusChanges = getStatusChanges(previousOrdersRef.current, updatedOrders);
                 
-                // Atualizar o estado
                 setOrders(updatedOrders);
                 setLastUpdated(new Date());
                 setLoading(false);
 
-                // 🔥 SÓ MOSTRAR NOTIFICAÇÕES SE NÃO FOR O PRIMEIRO CARREGAMENTO
                 if (!isFirstLoadRef.current && statusChanges.length > 0) {
                     statusChanges.forEach(change => {
                         showStatusNotification(change);
@@ -62,13 +87,18 @@ const MyOrders: React.FC = () => {
                     ]);
                 }
 
-                // 🔥 ATUALIZAR O REF COM OS NOVOS PEDIDOS
                 previousOrdersRef.current = updatedOrders;
                 isFirstLoadRef.current = false;
             },
-            (error) => {
-                console.error('❌ Erro no listener:', error);
-                toast.error('Erro ao carregar pedidos em tempo real');
+            (error: any) => {
+                console.error('Erro no listener:', error);
+                if (error.code === 'permission-denied') {
+                    toast.error('Sem permissão para acessar pedidos');
+                } else if (error.code === 'unavailable') {
+                    toast.error('Serviço indisponível. Tente novamente.');
+                } else {
+                    toast.error('Erro ao carregar pedidos em tempo real');
+                }
                 setLoading(false);
             }
         );
@@ -107,13 +137,14 @@ const MyOrders: React.FC = () => {
         newStatus: string;
         orderId: string;
     }) => {
+        // 🔥 SEM EMOJIS
         const statusLabels: Record<string, string> = {
             awaiting_payment: 'Aguardando Pagamento',
-            paid: 'Pago ✅',
-            processing: 'Processando 🔄',
-            shipped: 'Enviado 🚚',
-            delivered: 'Entregue 📦',
-            cancelled: 'Cancelado ❌',
+            paid: 'Pago',
+            processing: 'Processando',
+            shipped: 'Enviado',
+            delivered: 'Entregue',
+            cancelled: 'Cancelado',
         };
 
         const statusIcons: Record<string, string> = {
@@ -142,11 +173,10 @@ const MyOrders: React.FC = () => {
             }
         );
 
-        // Notificação do navegador
         if ('Notification' in window && Notification.permission === 'granted') {
             try {
                 const notification = new Notification(
-                    `🛒 Pedido #${change.orderNumber}`,
+                    `Pedido #${change.orderNumber}`,
                     ({
                         body: `Status atualizado: ${label}`,
                         icon: '/favicon.ico',
@@ -164,7 +194,6 @@ const MyOrders: React.FC = () => {
             }
         }
 
-        // Marcar como lida após mostrar
         setTimeout(() => {
             setUnreadNotifications(prev => 
                 prev.filter(id => id !== change.orderId)
@@ -172,7 +201,6 @@ const MyOrders: React.FC = () => {
         }, 1000);
     };
     
-    // Solicitar permissão para notificações
     useEffect(() => {
         if ('Notification' in window && Notification.permission === 'default') {
             Notification.requestPermission().then(() => {
@@ -184,70 +212,67 @@ const MyOrders: React.FC = () => {
         const newState = !soundEnabled;
         setSoundEnabled(newState);
         notificationService.toggleSound(newState);
-        toast.success(newState ? 'Som ativado 🔔' : 'Som desativado 🔇');
+        toast.success(newState ? 'Som ativado' : 'Som desativado');
     };
 
     const markAllAsRead = () => {
+        if (notificationCount === 0) {
+            toast.custom('Nenhuma notificação para marcar como lida');
+            return;
+        }
         setNotificationCount(0);
         setUnreadNotifications([]);
         toast.success('Todas as notificações marcadas como lidas');
     };
 
+    // 🔥 Filtrar pedidos por status
+    const filteredOrders = statusFilter === 'all' 
+        ? orders 
+        : orders.filter(order => order.status === statusFilter);
+
     const getStatusIcon = (status: string) => {
-        switch (status) {
-            case 'awaiting_payment':
-                return <Clock className="h-5 w-5 text-yellow-500" />;
-            case 'paid':
-                return <CheckCircle className="h-5 w-5 text-blue-500" />;
-            case 'processing':
-                return <Package className="h-5 w-5 text-purple-500" />;
-            case 'shipped':
-                return <Truck className="h-5 w-5 text-cyan-500" />;
-            case 'delivered':
-                return <CheckCircle className="h-5 w-5 text-green-500" />;
-            case 'cancelled':
-                return <XCircle className="h-5 w-5 text-red-500" />;
-            default:
-                return <Package className="h-5 w-5 text-gray-500" />;
-        }
+        const iconMap: Record<string, any> = {
+            awaiting_payment: Clock,
+            paid: CheckCircle,
+            processing: Package,
+            shipped: Truck,
+            delivered: CheckCircle,
+            cancelled: XCircle,
+        };
+        const Icon = iconMap[status] || Package;
+        const colorMap: Record<string, string> = {
+            awaiting_payment: 'text-yellow-500',
+            paid: 'text-blue-500',
+            processing: 'text-purple-500',
+            shipped: 'text-cyan-500',
+            delivered: 'text-green-500',
+            cancelled: 'text-red-500',
+        };
+        return <Icon className={`h-5 w-5 ${colorMap[status] || 'text-gray-500'}`} />;
     };
 
     const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'awaiting_payment':
-                return 'bg-yellow-100 text-yellow-700';
-            case 'paid':
-                return 'bg-blue-100 text-blue-700';
-            case 'processing':
-                return 'bg-purple-100 text-purple-700';
-            case 'shipped':
-                return 'bg-cyan-100 text-cyan-700';
-            case 'delivered':
-                return 'bg-green-100 text-green-700';
-            case 'cancelled':
-                return 'bg-red-100 text-red-700';
-            default:
-                return 'bg-gray-100 text-gray-700';
-        }
+        const colorMap: Record<string, string> = {
+            awaiting_payment: 'bg-yellow-100 text-yellow-700',
+            paid: 'bg-blue-100 text-blue-700',
+            processing: 'bg-purple-100 text-purple-700',
+            shipped: 'bg-cyan-100 text-cyan-700',
+            delivered: 'bg-green-100 text-green-700',
+            cancelled: 'bg-red-100 text-red-700',
+        };
+        return colorMap[status] || 'bg-gray-100 text-gray-700';
     };
 
     const getStatusLabel = (status: string) => {
-        switch (status) {
-            case 'awaiting_payment':
-                return 'Aguardando Pagamento';
-            case 'paid':
-                return 'Pago';
-            case 'processing':
-                return 'Processando';
-            case 'shipped':
-                return 'Enviado';
-            case 'delivered':
-                return 'Entregue';
-            case 'cancelled':
-                return 'Cancelado';
-            default:
-                return status;
-        }
+        const labelMap: Record<string, string> = {
+            awaiting_payment: 'Aguardando Pagamento',
+            paid: 'Pago',
+            processing: 'Processando',
+            shipped: 'Enviado',
+            delivered: 'Entregue',
+            cancelled: 'Cancelado',
+        };
+        return labelMap[status] || status;
     };
 
     const formatDate = (date: any) => {
@@ -287,10 +312,32 @@ const MyOrders: React.FC = () => {
         }
     };
 
+    const statusOptions = [
+        { value: 'all', label: 'Todos' },
+        { value: 'awaiting_payment', label: 'Aguardando Pagamento' },
+        { value: 'paid', label: 'Pago' },
+        { value: 'processing', label: 'Processando' },
+        { value: 'shipped', label: 'Enviado' },
+        { value: 'delivered', label: 'Entregue' },
+        { value: 'cancelled', label: 'Cancelado' },
+    ];
+
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            <div className="min-h-screen bg-gray-50 py-8">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex items-center justify-between mb-8">
+                        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                            <Package className="h-6 w-6 text-primary-600" />
+                            Meus Pedidos
+                        </h1>
+                    </div>
+                    <div className="space-y-4">
+                        {[1, 2, 3].map((i) => (
+                            <OrderSkeleton key={i} />
+                        ))}
+                    </div>
+                </div>
             </div>
         );
     }
@@ -298,7 +345,7 @@ const MyOrders: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-50 py-8">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                             <Package className="h-6 w-6 text-primary-600" />
@@ -317,7 +364,7 @@ const MyOrders: React.FC = () => {
                             )}
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
                         <button
                             onClick={toggleSound}
                             className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
@@ -339,6 +386,23 @@ const MyOrders: React.FC = () => {
                     </div>
                 </div>
 
+                {/* 🔥 Filtro de Status */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                    {statusOptions.map((opt) => (
+                        <button
+                            key={opt.value}
+                            onClick={() => setStatusFilter(opt.value)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                statusFilter === opt.value
+                                    ? 'bg-primary-600 text-white'
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+
                 {notificationCount > 0 && (
                     <button
                         onClick={markAllAsRead}
@@ -349,23 +413,36 @@ const MyOrders: React.FC = () => {
                     </button>
                 )}
 
-                {orders.length === 0 ? (
+                {filteredOrders.length === 0 ? (
                     <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-                        <Package className="h-16 w-16 mx-auto text-gray-300 mb-4" />
+                        <ShoppingBag className="h-16 w-16 mx-auto text-gray-300 mb-4" />
                         <h3 className="text-lg font-medium text-gray-900">Nenhum pedido encontrado</h3>
                         <p className="mt-1 text-sm text-gray-500">
-                            Você ainda não fez nenhum pedido.
+                            {orders.length === 0 
+                                ? 'Você ainda não fez nenhum pedido.' 
+                                : 'Nenhum pedido com o filtro selecionado.'}
                         </p>
-                        <Link
-                            to="/"
-                            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                        >
-                            Começar a comprar
-                        </Link>
+                        {orders.length > 0 && statusFilter !== 'all' && (
+                            <button
+                                onClick={() => setStatusFilter('all')}
+                                className="mt-4 text-sm text-primary-600 hover:text-primary-700"
+                            >
+                                <RefreshCw className="h-4 w-4 inline mr-1" />
+                                Limpar filtro
+                            </button>
+                        )}
+                        {orders.length === 0 && (
+                            <Link
+                                to="/"
+                                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                            >
+                                Começar a comprar
+                            </Link>
+                        )}
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {orders.map((order) => {
+                        {filteredOrders.map((order) => {
                             const isUnread = unreadNotifications.includes(order.id);
                             return (
                                 <div
@@ -388,7 +465,7 @@ const MyOrders: React.FC = () => {
                                                 <h3 className="font-semibold text-gray-900">
                                                     Pedido #{order.orderNumber}
                                                 </h3>
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                                                     {getStatusIcon(order.status)}
                                                     <span className="ml-1">{getStatusLabel(order.status)}</span>
                                                 </span>
@@ -415,7 +492,7 @@ const MyOrders: React.FC = () => {
                                                 alt={item.name}
                                                 className="h-12 w-12 rounded-lg object-cover border border-gray-200"
                                                 onError={(e) => {
-                                                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/48';
+                                                    (e.target as HTMLImageElement).src = '/placeholder-product.png';
                                                 }}
                                             />
                                         ))}
@@ -433,9 +510,10 @@ const MyOrders: React.FC = () => {
                                         </div>
                                         <Link
                                             to={`/order-confirmation/${order.id}`}
-                                            className="text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+                                            className="text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors inline-flex items-center gap-1"
                                         >
-                                            Ver detalhes →
+                                            Ver detalhes
+                                            <ArrowLeft className="h-3 w-3 rotate-180" />
                                         </Link>
                                     </div>
                                 </div>
