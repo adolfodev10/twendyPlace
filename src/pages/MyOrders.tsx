@@ -137,7 +137,6 @@ const MyOrders: React.FC = () => {
         newStatus: string;
         orderId: string;
     }) => {
-        // 🔥 SEM EMOJIS
         const statusLabels: Record<string, string> = {
             awaiting_payment: 'Aguardando Pagamento',
             paid: 'Pago',
@@ -147,17 +146,28 @@ const MyOrders: React.FC = () => {
             cancelled: 'Cancelado',
         };
 
-        const statusIcons: Record<string, string> = {
-            awaiting_payment: '⏳',
-            paid: '✅',
-            processing: '🔄',
-            shipped: '🚚',
-            delivered: '📦',
-            cancelled: '❌',
-        };
+        const getStatusIcon = (status: string) => {
+            switch (status) {
+                case 'awaiting_payment':
+                    return <Clock className="h-5 w-5" />;
+                case 'paid':
+                    return <CheckCircle className="h-5 w-5" />;
+                case 'processing':
+                    return <Package className="h-5 w-5" />;
+                case 'shipped':
+                    return <Truck className="h-5 w-5" />;
+                case 'delivered':
+                    return <CheckCircle className="h-5 w-5" />;
+                case 'cancelled':
+                    return <XCircle className="h-5 w-5" />;
+                default:
+                    return <Package className="h-5 w-5" />;
+            }
+        }
+
 
         const label = statusLabels[change.newStatus] || change.newStatus;
-        const icon = statusIcons[change.newStatus] || '📢';
+        const icon = getStatusIcon(change.newStatus);
 
         notificationService.showNotification(
             `Pedido #${change.orderNumber}: ${label}`,
@@ -165,7 +175,7 @@ const MyOrders: React.FC = () => {
                 type: change.newStatus === 'cancelled' ? 'error' : 
                        change.newStatus === 'delivered' ? 'success' : 'info',
                 duration: 8000,
-                icon: icon,
+                icon: icon as any,
                 sound: true,
                 onClick: () => {
                     window.location.href = `/order-confirmation/${change.orderId}`;

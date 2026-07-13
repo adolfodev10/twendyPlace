@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/authService';
 import toast from 'react-hot-toast';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+
+// 🔥 Chaves para localStorage
+const LOCKOUT_KEY = 'login_lockout_until';
+const ATTEMPTS_KEY = 'login_attempts';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -12,8 +16,32 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [loginAttempts, setLoginAttempts] = useState(() => {
+    const saved = localStorage.getItem(ATTEMPTS_KEY);
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [isLocked, setIsLocked] = useState(() => {
+    const lockoutUntil = localStorage.getItem(LOCKOUT_KEY);
+    if (lockoutUntil) {
+      const lockDate = new Date(lockoutUntil);
+      if (lockDate > new Date()) {
+        return true;
+      } else {
+        localStorage.removeItem(LOCKOUT_KEY);
+        localStorage.removeItem(ATTEMPTS_KEY);
+        return false;
+      }
+    }
+    return false;
+  });
+  const [remainingTime, setRemainingTime] = useState(0);
 
-  React.useEffect(() => {
+  const validateEmail = (email: string) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
+
+  useEffect(() => {
     if (user) {
       if (user.role === 'admin') {
         navigate('/admin');
@@ -23,9 +51,82 @@ const Login: React.FC = () => {
     }
   }, [user, navigate]);
 
+  // 🔥 Timer para contagem regressiva do lockout
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+
+    const updateRemainingTime = () => {
+      const lockoutUntil = localStorage.getItem(LOCKOUT_KEY);
+      if (lockoutUntil) {
+        const lockDate = new Date(lockoutUntil);
+        const now = new Date();
+        const diffMs = lockDate.getTime() - now.getTime();
+        const diffMin = Math.ceil(diffMs / 60000);
+
+        if (diffMin <= 0) {
+          localStorage.removeItem(LOCKOUT_KEY);
+          localStorage.removeItem(ATTEMPTS_KEY);
+          setIsLocked(false);
+          setLoginAttempts(0);
+          setRemainingTime(0);
+        } else {
+          setIsLocked(true);
+          setRemainingTime(diffMin);
+        }
+      }
+    };
+
+    if (isLocked) {
+      interval = setInterval(updateRemainingTime, 1000);
+    }
+
+    return () => clearInterval(interval);
+  }, [isLocked]); // ✅ OK
+
+  // 🔥 Verificar bloqueio ao carregar a página (executa apenas uma vez)
+  useEffect(() => {
+    const lockoutUntil = localStorage.getItem(LOCKOUT_KEY);
+    if (lockoutUntil) {
+      const lockDate = new Date(lockoutUntil);
+      if (lockDate > new Date()) {
+        setIsLocked(true);
+        const diffMs = lockDate.getTime() - new Date().getTime();
+        setRemainingTime(Math.ceil(diffMs / 60000));
+      } else {
+        localStorage.removeItem(LOCKOUT_KEY);
+        localStorage.removeItem(ATTEMPTS_KEY);
+        setIsLocked(false);
+        setLoginAttempts(0);
+      }
+    }
+  }, []); // ✅ Array vazio = executa apenas uma vez
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    const lockoutUntil = localStorage.getItem(LOCKOUT_KEY);
+    if (lockoutUntil) {
+      const lockDate = new Date(lockoutUntil);
+      if (lockDate > new Date()) {
+        setIsLocked(true);
+        toast.error(`Conta bloqueada. Aguarde ${remainingTime} minutos.`, {
+          icon: <AlertCircle className="w-5 h-5 text-red-500" />,
+          duration: 5000,
+        });
+        return;
+      } else {
+        localStorage.removeItem(LOCKOUT_KEY);
+        localStorage.removeItem(ATTEMPTS_KEY);
+        setIsLocked(false);
+        setLoginAttempts(0);
+      }
+    }
+
+    if (!validateEmail(email)) {
+      toast.error('Por favor, insira um email válido');
+      return;
+    }
+
     if (!email || !password) {
       toast.error('Preencha todos os campos');
       return;
@@ -34,11 +135,32 @@ const Login: React.FC = () => {
     setLoading(true);
     try {
       const result = await authService.login(email, password);
-      
+
       if (result.success) {
+        localStorage.removeItem(ATTEMPTS_KEY);
+        localStorage.removeItem(LOCKOUT_KEY);
+        setLoginAttempts(0);
+        setIsLocked(false);
+        setRemainingTime(0);
         toast.success('Login realizado com sucesso!');
       } else {
-        toast.error(result.error || 'Erro ao fazer login');
+        const newAttempts = loginAttempts + 1;
+        setLoginAttempts(newAttempts);
+        localStorage.setItem(ATTEMPTS_KEY, String(newAttempts));
+
+        if (newAttempts >= 5) {
+          const lockUntil = new Date();
+          lockUntil.setMinutes(lockUntil.getMinutes() + 5);
+          localStorage.setItem(LOCKOUT_KEY, lockUntil.toISOString());
+          setIsLocked(true);
+          setRemainingTime(5);
+          toast.error('Muitas tentativas. Aguarde 5 minutos.', {
+            icon: <AlertCircle className="w-5 h-5 text-red-500" />,
+            duration: 5000,
+          });
+        } else {
+          toast.error(`${result.error || 'Erro ao fazer login'}`);
+        }
       }
     } catch (error) {
       toast.error('Erro ao fazer login. Tente novamente.');
@@ -62,6 +184,16 @@ const Login: React.FC = () => {
           <p className="mt-2 text-center text-sm text-gray-600">
             Entre na sua conta para continuar
           </p>
+
+          {isLocked && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+              <p className="text-sm text-red-600 font-medium">
+                Conta bloqueada. Aguarde {remainingTime} minuto{remainingTime !== 1 ? 's' : ''}.
+              </p>
+            </div>
+          )}
+
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -82,7 +214,7 @@ const Login: React.FC = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   className="appearance-none rounded-lg relative block w-full px-3 py-2 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
                   placeholder="seu@email.com"
-                  disabled={loading}
+                  disabled={loading || isLocked}
                 />
               </div>
             </div>
@@ -103,7 +235,7 @@ const Login: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="appearance-none rounded-lg relative block w-full px-3 py-2 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
                   placeholder="••••••••"
-                  disabled={loading}
+                  disabled={loading || isLocked}
                 />
               </div>
             </div>
@@ -118,7 +250,7 @@ const Login: React.FC = () => {
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
                 className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                disabled={loading}
+                disabled={loading || isLocked}
               />
               <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
                 Lembrar-me
@@ -135,7 +267,7 @@ const Login: React.FC = () => {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || isLocked}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -145,6 +277,11 @@ const Login: React.FC = () => {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                   Entrando...
+                </span>
+              ) : isLocked ? (
+                <span className="flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  Bloqueado
                 </span>
               ) : (
                 <span className="flex items-center">

@@ -23,6 +23,12 @@ const Register: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
 
+  const validateEmail = (email: string) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  }
+
+
   React.useEffect(() => {
     if (user) {
       navigate('/');
@@ -38,6 +44,12 @@ const Register: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateEmail(formData.email)) {
+      toast.error("Por favor, insira um email válido");
+      return;
+
+    }
 
     if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
       toast.error('Preencha todos os campos obrigatórios');

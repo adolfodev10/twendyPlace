@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Order } from '../types';
 import { cartService } from '../services/cartService';
-import { CheckCircle, Package, Truck, Clock, ArrowLeft, Home, Bell } from 'lucide-react';
+import { CheckCircle, Package, Truck, Clock, ArrowLeft, Home, Bell, RefreshCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const OrderConfirmation: React.FC = () => {
@@ -66,18 +66,18 @@ const OrderConfirmation: React.FC = () => {
   const showStatusNotification = (order: Order) => {
     const statusLabels: Record<string, string> = {
       awaiting_payment: 'Aguardando Pagamento',
-      paid: 'Pago ✅',
-      processing: 'Processando 🔄',
-      shipped: 'Enviado 🚚',
-      delivered: 'Entregue 📦',
-      cancelled: 'Cancelado ❌',
+      paid: 'Pago ',
+      processing: 'Processando ',
+      shipped: 'Enviado ',
+      delivered: 'Entregue ',
+      cancelled: 'Cancelado ',
     };
 
     toast.success(
       `Status do pedido #${order.orderNumber} atualizado: ${statusLabels[order.status] || order.status}`,
       {
         duration: 8000,
-        icon: '🔄',
+        icon: <RefreshCcw className='w-5 h-5 text-blue-500' />,
       }
     );
 
