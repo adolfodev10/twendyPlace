@@ -10,7 +10,6 @@ class NotificationService {
   constructor() {
     // Detectar se é mobile
     this.isMobile = /Android|iPhone|iPad|iPod|BlackBerry|Opera Mini|IEMobile/i.test(navigator.userAgent);
-    console.log(`📱 Dispositivo: ${this.isMobile ? 'Mobile' : 'Desktop'}`);
     
     this.setupUserInteraction();
   }
@@ -21,11 +20,9 @@ class NotificationService {
         try {
           this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
           this.isInitialized = true;
-          console.log('🔊 AudioContext inicializado');
           
           // Tocar sons pendentes
           if (this.pendingSounds.length > 0) {
-            console.log(`🔊 Tocando ${this.pendingSounds.length} sons pendentes`);
             this.pendingSounds.forEach(sound => {
               this.playSound(sound.type);
             });
@@ -55,14 +52,11 @@ class NotificationService {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       if (this.audioContext.state === 'running') {
         this.isInitialized = true;
-        console.log('🔊 AudioContext inicializado (já ativo)');
       } else if (this.audioContext.state === 'suspended') {
         // No mobile, o AudioContext geralmente começa suspenso
-        console.log('⏸️ AudioContext suspenso, aguardando interação');
         // Tenta resumir automaticamente (pode funcionar em alguns casos)
         if (!this.isMobile) {
           this.audioContext.resume().then(() => {
-            console.log('▶️ AudioContext resumido automaticamente');
             this.isInitialized = true;
           }).catch(() => {});
         }
@@ -75,7 +69,6 @@ class NotificationService {
   public ensureAudioContext() {
     if (this.audioContext && this.audioContext.state === 'suspended') {
       this.audioContext.resume().then(() => {
-        console.log('▶️ AudioContext resumido');
         this.isInitialized = true;
         // Tocar sons pendentes
         if (this.pendingSounds.length > 0) {
@@ -85,7 +78,6 @@ class NotificationService {
           this.pendingSounds = [];
         }
       }).catch(() => {
-        console.log('❌ Não foi possível resumir AudioContext');
       });
       return;
     }
@@ -94,7 +86,6 @@ class NotificationService {
       try {
         this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         this.isInitialized = true;
-        console.log('🔊 AudioContext inicializado (forçado)');
       } catch (e) {
         console.warn('Não foi possível inicializar AudioContext');
       }
@@ -103,7 +94,6 @@ class NotificationService {
 
   private playSound(type: 'notification' | 'success' | 'error') {
     if (!this.isSoundEnabled) {
-      console.log('🔇 Som desativado');
       return;
     }
 
@@ -111,26 +101,21 @@ class NotificationService {
     if (this.isMobile && navigator.vibrate) {
       try {
         navigator.vibrate([100, 50, 100]);
-        console.log('📳 Vibração ativada (mobile)');
       } catch (e) {
         // Ignorar erro de vibração
       }
     }
 
     if (!this.audioContext || !this.isInitialized) {
-      console.log(`📌 Armazenando som "${type}" para tocar depois`);
       this.pendingSounds.push({ type });
       this.ensureAudioContext();
       return;
     }
 
     if (this.audioContext.state === 'suspended') {
-      console.log('⏸️ AudioContext suspenso, tentando resumir...');
       this.audioContext.resume().then(() => {
-        console.log('▶️ AudioContext resumido');
         this.playSoundInternal(type);
       }).catch(() => {
-        console.log('❌ Não foi possível resumir AudioContext');
         this.pendingSounds.push({ type });
       });
       return;
@@ -144,7 +129,6 @@ class NotificationService {
 
     try {
       const now = this.audioContext.currentTime;
-      console.log(`🔊 Tocando som: ${type}`);
       
       // No mobile, usar tons mais altos e curtos
       const isMobile = this.isMobile;
@@ -299,13 +283,11 @@ class NotificationService {
   }) {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'denied') {
-      console.log('📢 Notificações bloqueadas pelo usuário');
       return;
     }
 
     if (Notification.permission === 'default') {
       Notification.requestPermission().then(permission => {
-        console.log('📢 Permissão de notificação:', permission);
         if (permission === 'granted') {
           this.sendBrowserNotification(message, options);
         }
@@ -331,7 +313,6 @@ class NotificationService {
         }
       };
       
-      console.log('📢 Notificação enviada:', message);
     } catch (error) {
       console.debug('Erro ao enviar notificação:', error);
     }
@@ -339,7 +320,6 @@ class NotificationService {
 
   toggleSound(enabled: boolean) {
     this.isSoundEnabled = enabled;
-    console.log(`🔊 Som ${enabled ? 'ativado' : 'desativado'}`);
     // Se estiver desativando, parar sons pendentes
     if (!enabled) {
       this.pendingSounds = [];
@@ -351,7 +331,6 @@ class NotificationService {
   }
 
   testSound() {
-    console.log('🔊 Testando sons...');
     // Tentar garantir que o AudioContext está ativo
     this.ensureAudioContext();
     
@@ -368,7 +347,6 @@ class NotificationService {
       this.playSound('error');
     }, 700);
     setTimeout(() => {
-      console.log('✅ Teste de som concluído');
       if (this.isMobile) {
         toast.success('📱 Modo mobile detectado - verifique o volume do dispositivo');
       }

@@ -269,7 +269,6 @@ const OrdersManager: React.FC = () => {
                 });
             }
             await batch.commit();
-            console.log('Estoque restaurado com sucesso');
         } catch (error) {
             console.error('Erro ao restaurar estoque:', error);
         }
@@ -283,7 +282,6 @@ const OrdersManager: React.FC = () => {
                 ...notification,
                 createdAt: serverTimestamp(),
             });
-            console.log('Notificação salva para o cliente:', userId);
         } catch (error) {
             console.error('Erro ao salvar notificação:', error);
         }
