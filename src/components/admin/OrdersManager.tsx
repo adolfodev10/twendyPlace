@@ -289,10 +289,6 @@ const OrdersManager: React.FC = () => {
         }
     };
 
-    const getStatusLabel = (status: string): string => {
-        return STATUS_HISTORY[status]?.label || status;
-    };
-
     const getStatusIcon = (status: string) => {
         const Icon = STATUS_HISTORY[status]?.icon;
         if (!Icon) return <Package className="w-4 h-4 text-gray-500" />;
