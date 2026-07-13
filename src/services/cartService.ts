@@ -83,7 +83,8 @@ export const cartService = {
         cartItems: CartItem[],
         totalAmount: number,
         customerData: any,
-        paymentMethod: string = "multicaixa"
+        paymentMethod: string = "multicaixa",
+        paymentProof?:string
     ): Promise<{ success: boolean; orderId?: string; orderNumber?: string; error?: string }> {
         try {
             const orderNumber = "ORD-" + Date.now().toString().slice(-8);
@@ -104,6 +105,7 @@ export const cartService = {
                 total: totalAmount,
                 status: "awaiting_payment",
                 paymentMethod: paymentMethod,
+                paymentProof: paymentProof || null,
                 customer: customerData,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),

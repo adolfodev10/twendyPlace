@@ -48,6 +48,7 @@ export interface Order {
   total: number;
   status: 'awaiting_payment' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   paymentMethod: string;
+  paymentProof:string;
   customer?: {
     name: string;
     email: string;

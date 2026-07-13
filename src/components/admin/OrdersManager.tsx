@@ -17,16 +17,20 @@ import {
     XCircle,
     Send,
     Loader2,
-    AlertTriangle
+    AlertTriangle,
+    Download,
+    FileImage,
+    X,
+    Eye
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { 
-    doc, 
-    getDoc, 
-    updateDoc, 
-    serverTimestamp, 
-    setDoc, 
-    collection, 
+import {
+    doc,
+    getDoc,
+    updateDoc,
+    serverTimestamp,
+    setDoc,
+    collection,
     arrayUnion,
     increment,
     writeBatch
@@ -115,7 +119,9 @@ const OrdersManager: React.FC = () => {
     const [search, setSearch] = useState('');
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [updating, setUpdating] = useState<string | null>(null);
-    
+    const [viewingProof, setViewingProof] = useState<{ orderId: string; url: string } | null>(null);
+
+
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
         orderId: string;
@@ -170,6 +176,11 @@ const OrdersManager: React.FC = () => {
     };
 
     const openConfirmModal = (orderId: string, newStatus: string, oldStatus: string, orderNumber: string) => {
+        const order = orders.find(o => o.id === orderId);
+        if (order && !order.paymentProof && newStatus !== 'cancelled') {
+            toast.error('Aguardando comprovativo de pagamento');
+            return;
+        }
         if (!isTransitionAllowed(oldStatus, newStatus)) {
             toast.error(`Não é possível mudar de "${STATUS_HISTORY[oldStatus]?.label || oldStatus}" para "${STATUS_HISTORY[newStatus]?.label || newStatus}"`);
             return;
@@ -245,7 +256,7 @@ const OrdersManager: React.FC = () => {
 
         } catch (error: any) {
             console.error('Erro ao atualizar status:', error);
-            
+
             if (error.code === 'permission-denied') {
                 toast.error('Sem permissão para alterar status');
             } else if (error.code === 'not-found') {
@@ -272,6 +283,53 @@ const OrdersManager: React.FC = () => {
         } catch (error) {
             console.error('Erro ao restaurar estoque:', error);
         }
+    };
+
+    const ProofViewerModal: React.FC<{
+        isOpen: boolean;
+        onClose: () => void;
+        url: string;
+        orderNumber: string;
+    }> = ({ isOpen, onClose, url, orderNumber }) => {
+        if (!isOpen) return null;
+
+        return (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+                <div className="relative bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] shadow-2xl animate-[modalSlideUp_0.3s_ease]">
+                    <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <FileImage className="w-5 h-5 text-primary-600" />
+                            Comprovativo - Pedido #{orderNumber}
+                        </h3>
+                        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
+                            <X className="w-5 h-5 text-gray-500" />
+                        </button>
+                    </div>
+                    <div className="p-4 overflow-y-auto max-h-[70vh]">
+                        {url.match(/\.(pdf)$/i) ? (
+                            <iframe src={url} className="w-full h-[500px] rounded-lg" />
+                        ) : (
+                            <img src={url} alt="Comprovativo" className="w-full rounded-lg" />
+                        )}
+                    </div>
+                    <div className="p-4 border-t border-gray-200 flex gap-3">
+                        <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                        >
+                            <Download className="w-4 h-4" />
+                            Baixar
+                        </a>
+                        <button onClick={onClose} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     const saveNotificationForClient = async (userId: string, notification: any) => {
@@ -478,6 +536,12 @@ const OrdersManager: React.FC = () => {
                                     </div>
                                 </th>
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">Status</th>
+                                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 hidden lg:table-cell">
+                                    <div className="flex items-center gap-1">
+                                        <FileImage className="w-3.5 h-3.5" />
+                                        Comprovativo
+                                    </div>
+                                </th>
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">Ações</th>
                             </tr>
                         </thead>
@@ -521,6 +585,19 @@ const OrdersManager: React.FC = () => {
                                                     <span>{STATUS_HISTORY[order.status]?.label || order.status}</span>
                                                 </span>
                                             </td>
+                                            <td className="py-3 px-3 sm:px-4 hidden lg:table-cell">
+                                                {order.paymentProof ? (
+                                                    <button
+                                                        onClick={() => setViewingProof({ orderId: order.id, url: order.paymentProof })}
+                                                        className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        title="Ver comprovativo"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">Não enviado</span>
+                                                )}
+                                            </td>
                                             <td className="py-3 px-3 sm:px-4">
                                                 <div className="flex items-center gap-2">
                                                     <select
@@ -553,7 +630,14 @@ const OrdersManager: React.FC = () => {
                     </table>
                 </div>
             </div>
+            <ProofViewerModal
+                isOpen={!!viewingProof}
+                onClose={() => setViewingProof(null)}
+                url={viewingProof?.url || ''}
+                orderNumber={orders.find(o => o.id === viewingProof?.orderId)?.orderNumber || ''}
+            />
         </div>
+
     );
 };
 
