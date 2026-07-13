@@ -3,7 +3,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { Order } from '../types';
 import { cartService } from '../services/cartService';
 import { Link } from 'react-router-dom';
-import { Package, Clock, CheckCircle, Truck, XCircle, ArrowLeft, Bell } from 'lucide-react';
+import { 
+  Package, 
+  Clock, 
+  CheckCircle, 
+  Truck, 
+  XCircle, 
+  ArrowLeft, 
+  Bell,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const MyOrders: React.FC = () => {
@@ -11,6 +19,7 @@ const MyOrders: React.FC = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+    const [notificationCount, setNotificationCount] = useState(0);
 
     useEffect(() => {
         if (!user) {
@@ -24,12 +33,22 @@ const MyOrders: React.FC = () => {
         const unsubscribe = cartService.onUserOrders(
             user.uid,
             (updatedOrders) => {
+                // Verificar mudanças de status antes de atualizar
+                const statusChanges = getStatusChanges(orders, updatedOrders);
+                
                 setOrders(updatedOrders);
                 setLastUpdated(new Date());
                 setLoading(false);
 
-                // Verificar se algum pedido mudou de status
-                checkForStatusChanges(updatedOrders);
+                // Mostrar notificações para cada mudança
+                statusChanges.forEach(change => {
+                    showStatusNotification(change);
+                });
+
+                // Atualizar contador de notificações
+                if (statusChanges.length > 0) {
+                    setNotificationCount(prev => prev + statusChanges.length);
+                }
             },
             (error) => {
                 console.error('Erro no listener:', error);
@@ -44,50 +63,94 @@ const MyOrders: React.FC = () => {
         };
     }, [user]);
 
-    // Salvar o estado anterior para comparação
-    const prevOrdersRef = React.useRef<Order[]>([]);
+    // Função para comparar status entre pedidos antigos e novos
+    const getStatusChanges = (oldOrders: Order[], newOrders: Order[]): {
+        orderNumber: string;
+        oldStatus: string;
+        newStatus: string;
+        orderId: string;
+    }[] => {
+        const changes: {
+            orderNumber: string;
+            oldStatus: string;
+            newStatus: string;
+            orderId: string;
+        }[] = [];
 
-    // Função para verificar mudanças de status e notificar
-    const checkForStatusChanges = (newOrders: Order[]) => {
-        if (prevOrdersRef.current.length > 0) {
-            // Verificar se algum pedido mudou
-            const statusChanges: { orderNumber: string; oldStatus: string; newStatus: string }[] = [];
+        newOrders.forEach((newOrder) => {
+            const oldOrder = oldOrders.find(o => o.id === newOrder.id);
+            if (oldOrder && oldOrder.status !== newOrder.status) {
+                changes.push({
+                    orderNumber: newOrder.orderNumber || newOrder.id.slice(-8),
+                    oldStatus: oldOrder.status,
+                    newStatus: newOrder.status,
+                    orderId: newOrder.id,
+                });
+            }
+        });
 
-            newOrders.forEach((newOrder) => {
-                const oldOrder = prevOrdersRef.current.find(o => o.id === newOrder.id);
-                if (oldOrder && oldOrder.status !== newOrder.status) {
-                    statusChanges.push({
-                        orderNumber: newOrder.orderNumber || newOrder.id.slice(-8),
-                        oldStatus: oldOrder.status,
-                        newStatus: newOrder.status
-                    });
-                }
-            });
+        return changes;
+    };
 
-            // Mostrar notificações para mudanças
-            statusChanges.forEach((change) => {
-                const statusLabels: Record<string, string> = {
-                    awaiting_payment: 'Aguardando Pagamento',
-                    paid: 'Pago ✅',
-                    processing: 'Processando 🔄',
-                    shipped: 'Enviado 🚚',
-                    delivered: 'Entregue 📦',
-                    cancelled: 'Cancelado ❌',
-                };
+    // Função para mostrar notificação de status
+    const showStatusNotification = (change: {
+        orderNumber: string;
+        oldStatus: string;
+        newStatus: string;
+        orderId: string;
+    }) => {
+        const statusIcons: Record<string, string> = {
+            awaiting_payment: '⏳',
+            paid: '✅',
+            processing: '🔄',
+            shipped: '🚚',
+            delivered: '📦',
+            cancelled: '❌',
+        };
 
-                toast.success(
-                    `Pedido #${change.orderNumber} atualizado para: ${statusLabels[change.newStatus] || change.newStatus}`,
-                    {
-                        duration: 5000,
-                        icon: '🔄'
-                    }
-                );
+        const statusLabels: Record<string, string> = {
+            awaiting_payment: 'Aguardando Pagamento',
+            paid: 'Pago',
+            processing: 'Processando',
+            shipped: 'Enviado',
+            delivered: 'Entregue',
+            cancelled: 'Cancelado',
+        };
+
+        const icon = statusIcons[change.newStatus] || '📢';
+        const label = statusLabels[change.newStatus] || change.newStatus;
+
+        // Toast com botão para ver o pedido
+        toast.success(
+            `Pedido #${change.orderNumber} - ${label}`,
+            {
+                duration: 8000,
+                icon: icon,
+                style: {
+                    minWidth: '300px',
+                },
+                // @ts-ignore - propriedade customizada
+                onClick: () => {
+                    window.location.href = `/order-confirmation/${change.orderId}`;
+                },
+            }
+        );
+
+        // Notificação do navegador (se permitido)
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(`Twendy Create - Pedido #${change.orderNumber}`, {
+                body: `Status atualizado para: ${label}`,
+                icon: '/favicon.ico',
             });
         }
-
-        // Atualizar referência
-        prevOrdersRef.current = newOrders;
     };
+
+    // Solicitar permissão para notificações do navegador
+    useEffect(() => {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    }, []);
 
     const getStatusIcon = (status: string) => {
         switch (status) {
@@ -203,10 +266,15 @@ const MyOrders: React.FC = () => {
                         </h1>
                         <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
                             <Bell className="h-4 w-4" />
-                            Atualizações em tempo real automáticas
+                            Atualizações em tempo real
                             <span className="text-xs text-gray-400">
                                 (Última atualização: {lastUpdated.toLocaleTimeString()})
                             </span>
+                            {notificationCount > 0 && (
+                                <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                    {notificationCount} novas
+                                </span>
+                            )}
                         </p>
                     </div>
                     <Link
@@ -217,6 +285,17 @@ const MyOrders: React.FC = () => {
                         Voltar à loja
                     </Link>
                 </div>
+
+                {/* Botão para limpar notificações */}
+                {notificationCount > 0 && (
+                    <button
+                        onClick={() => setNotificationCount(0)}
+                        className="mb-4 text-sm text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-1"
+                    >
+                        <Bell className="h-4 w-4" />
+                        Marcar todas como lidas
+                    </button>
+                )}
 
                 {orders.length === 0 ? (
                     <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
@@ -237,8 +316,15 @@ const MyOrders: React.FC = () => {
                         {orders.map((order) => (
                             <div
                                 key={order.id}
-                                className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow"
+                                className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow relative"
                             >
+                                {/* Badge de novidade (se status mudou recentemente) */}
+                                {notificationCount > 0 && (
+                                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+                                        NOVO
+                                    </div>
+                                )}
+
                                 <div className="flex flex-wrap items-start justify-between gap-4">
                                     <div>
                                         <div className="flex items-center gap-3">
@@ -288,14 +374,12 @@ const MyOrders: React.FC = () => {
                                         <span className="font-medium">Entrega:</span>{' '}
                                         {order.customer?.address || 'Endereço não informado'}
                                     </div>
-                                    <button
+                                    <Link
+                                        to={`/order-confirmation/${order.id}`}
                                         className="text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
-                                        onClick={() => {
-                                            toast.success('Detalhes do pedido em breve');
-                                        }}
                                     >
                                         Ver detalhes →
-                                    </button>
+                                    </Link>
                                 </div>
                             </div>
                         ))}

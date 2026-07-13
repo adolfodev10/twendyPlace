@@ -15,8 +15,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
 
   const isAdmin = user?.role === 'admin';
 
-  console.log('User in ProductGrid:', user);
-
   const handleAddToCart = (product: Product) => {
 
     if (isAdmin) {

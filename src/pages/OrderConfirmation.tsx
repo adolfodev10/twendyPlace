@@ -12,6 +12,7 @@ const OrderConfirmation: React.FC = () => {
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statusChanged, setStatusChanged] = useState(false);
 
   useEffect(() => {
     if (!orderId) {
@@ -37,24 +38,15 @@ const OrderConfirmation: React.FC = () => {
             navigate('/');
             return;
           }
+          
+          // Verificar se houve mudança de status
+          if (order && order.status !== updatedOrder.status) {
+            setStatusChanged(true);
+            showStatusNotification(updatedOrder);
+          }
+          
           setOrder(updatedOrder);
           setLoading(false);
-          
-          // Mostrar notificação se o status mudou
-          if (order && order.status !== updatedOrder.status) {
-            const statusLabels: Record<string, string> = {
-              awaiting_payment: 'Aguardando Pagamento',
-              paid: 'Pago ✅',
-              processing: 'Processando 🔄',
-              shipped: 'Enviado 🚚',
-              delivered: 'Entregue 📦',
-              cancelled: 'Cancelado ❌',
-            };
-            toast(
-              `Status do pedido atualizado: ${statusLabels[updatedOrder.status] || updatedOrder.status}`,
-              { duration: 5000, icon: '🔄' }
-            );
-          }
         } else {
           toast.error('Pedido não encontrado');
           navigate('/');
@@ -67,9 +59,36 @@ const OrderConfirmation: React.FC = () => {
       }
     );
 
-    // Limpar listener ao desmontar
     return () => unsubscribe();
   }, [orderId, user, navigate]);
+
+  // Função para mostrar notificação de status
+  const showStatusNotification = (order: Order) => {
+    const statusLabels: Record<string, string> = {
+      awaiting_payment: 'Aguardando Pagamento',
+      paid: 'Pago ✅',
+      processing: 'Processando 🔄',
+      shipped: 'Enviado 🚚',
+      delivered: 'Entregue 📦',
+      cancelled: 'Cancelado ❌',
+    };
+
+    toast.success(
+      `Status do pedido #${order.orderNumber} atualizado: ${statusLabels[order.status] || order.status}`,
+      {
+        duration: 8000,
+        icon: '🔄',
+      }
+    );
+
+    // Notificação do navegador
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(`Twendy Create - Pedido #${order.orderNumber}`, {
+        body: `Status atualizado para: ${statusLabels[order.status] || order.status}`,
+        icon: '/favicon.ico',
+      });
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -128,7 +147,6 @@ const OrderConfirmation: React.FC = () => {
     }
   };
 
-  // Formatar data com fallback
   const formatDate = (date: any) => {
     if (!date) return 'Data não disponível';
     try {
@@ -213,6 +231,9 @@ const OrderConfirmation: React.FC = () => {
             <div className="flex items-center gap-1 text-xs text-gray-400">
               <Bell className="h-3 w-3" />
               <span>Atualizações em tempo real</span>
+              {statusChanged && (
+                <span className="ml-1 text-green-600 font-medium">✓ Atualizado</span>
+              )}
             </div>
           </div>
         </div>
