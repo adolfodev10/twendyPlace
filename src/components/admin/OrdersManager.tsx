@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { cartService } from '../../services/cartService';
 import { Order } from '../../types';
-import { Search,  RefreshCw, Bell } from 'lucide-react';
+import { Search, RefreshCw, Bell} from 'lucide-react';
 import toast from 'react-hot-toast';
+import { doc, getDoc, updateDoc, serverTimestamp, setDoc, collection } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 
 const OrdersManager: React.FC = () => {
     const [orders, setOrders] = useState<Order[]>([]);
@@ -10,18 +12,16 @@ const OrdersManager: React.FC = () => {
     const [filter, setFilter] = useState('all');
     const [search, setSearch] = useState('');
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+    const [updating, setUpdating] = useState<string | null>(null);
 
     useEffect(() => {
         setLoading(true);
 
-        // 🔥 LISTENER EM TEMPO REAL PARA ADMIN
         const unsubscribe = cartService.onAllOrders(
             (updatedOrders) => {
                 setOrders(updatedOrders);
                 setLastUpdated(new Date());
                 setLoading(false);
-                
-                // Verificar novos pedidos
                 checkForNewOrders(updatedOrders);
             },
             filter,
@@ -35,7 +35,6 @@ const OrdersManager: React.FC = () => {
         return () => unsubscribe();
     }, [filter]);
 
-    // Detectar novos pedidos
     const prevOrdersRef = React.useRef<Order[]>([]);
 
     const checkForNewOrders = (newOrders: Order[]) => {
@@ -51,13 +50,81 @@ const OrdersManager: React.FC = () => {
 
     const handleStatusChange = async (orderId: string, newStatus: string) => {
         if (!newStatus) return;
+        setUpdating(orderId);
+
         try {
-            await cartService.updateOrderStatus(orderId, newStatus);
-            toast.success('Status atualizado com sucesso!');
+            // Buscar o pedido antes de atualizar
+            const orderRef = doc(db, 'orders', orderId);
+            const orderSnap = await getDoc(orderRef);
+            
+            if (!orderSnap.exists()) {
+                toast.error('Pedido não encontrado');
+                setUpdating(null);
+                return;
+            }
+
+            const orderData = orderSnap.data() as Record<string, any>;
+            const oldStatus = orderData?.status;
+
+            // Atualizar status
+            await updateDoc(orderRef, {
+                status: newStatus,
+                updatedAt: serverTimestamp(),
+            });
+
+            // 🔔 NOTIFICAR O CLIENTE (salvar notificação no Firebase)
+            if (orderData?.userId) {
+                await saveNotificationForClient(orderData.userId, {
+                    orderId: orderId,
+                    orderNumber: orderData.orderNumber || orderId.slice(-8),
+                    oldStatus: oldStatus,
+                    newStatus: newStatus,
+                    message: `Status do pedido #${orderData.orderNumber || orderId.slice(-8)} atualizado para ${getStatusLabel(newStatus)}`,
+                    timestamp: new Date().toISOString(),
+                    read: false,
+                });
+            }
+
+            toast.success(`✅ Status atualizado para: ${getStatusLabel(newStatus)}`);
+
+            // 🔊 Notificação para o admin (feedback visual)
+            toast.success(`📨 Notificação enviada para o cliente`, {
+                icon: '📨',
+                duration: 3000,
+            });
+
         } catch (error) {
             console.error('Erro ao atualizar status:', error);
             toast.error('Erro ao atualizar status');
+        } finally {
+            setUpdating(null);
         }
+    };
+
+    // Salvar notificação no Firestore para o cliente
+    const saveNotificationForClient = async (userId: string, notification: any) => {
+        try {
+            const notificationsRef = doc(collection(db, 'notifications'));
+            await setDoc(notificationsRef, {
+                userId: userId,
+                ...notification,
+                createdAt: serverTimestamp(),
+            });
+        } catch (error) {
+            console.error('Erro ao salvar notificação:', error);
+        }
+    };
+
+    const getStatusLabel = (status: string): string => {
+        const labels: Record<string, string> = {
+            awaiting_payment: 'Aguardando Pagamento',
+            paid: 'Pago',
+            processing: 'Processando',
+            shipped: 'Enviado',
+            delivered: 'Entregue',
+            cancelled: 'Cancelado',
+        };
+        return labels[status] || status;
     };
 
     const statusOptions = [
@@ -88,7 +155,6 @@ const OrdersManager: React.FC = () => {
         cancelled: 'Cancelado',
     };
 
-    // Formatar data com fallback
     const formatDate = (date: any) => {
         if (!date) return 'Data não disponível';
         try {
@@ -159,7 +225,6 @@ const OrdersManager: React.FC = () => {
                 </div>
                 <button
                     onClick={() => {
-                        // Forçar recarga dos dados
                         setLoading(true);
                         setTimeout(() => setLoading(false), 500);
                     }}
@@ -247,15 +312,21 @@ const OrdersManager: React.FC = () => {
                                             </span>
                                         </td>
                                         <td className="py-3 px-4">
-                                            <select
-                                                value={order.status}
-                                                onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                                                className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                                            >
-                                                {statusOptions.filter(opt => opt.value !== 'all').map(opt => (
-                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                ))}
-                                            </select>
+                                            <div className="flex items-center gap-2">
+                                                <select
+                                                    value={order.status}
+                                                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                                                    disabled={updating === order.id}
+                                                    className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:opacity-50"
+                                                >
+                                                    {statusOptions.filter(opt => opt.value !== 'all').map(opt => (
+                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                    ))}
+                                                </select>
+                                                {updating === order.id && (
+                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
