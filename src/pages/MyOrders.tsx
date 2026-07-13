@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Order } from '../types';
 import { cartService } from '../services/cartService';
 import { notificationService } from '../services/notificationService';
 import { Link } from 'react-router-dom';
-import {
-    Package,
-    Clock,
-    CheckCircle,
-    Truck,
-    XCircle,
-    ArrowLeft,
-    Bell,
-    Volume2,
-    VolumeX
+import { 
+  Package, 
+  Clock, 
+  CheckCircle, 
+  Truck, 
+  XCircle, 
+  ArrowLeft, 
+  Bell,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -25,19 +25,10 @@ const MyOrders: React.FC = () => {
     const [notificationCount, setNotificationCount] = useState(0);
     const [soundEnabled, setSoundEnabled] = useState(true);
     const [unreadNotifications, setUnreadNotifications] = useState<string[]>([]);
-
-    // 🔥 VERIFICAR E GARANTIR QUE O SOM ESTÁ ATIVADO
-    useEffect(() => {
-        // Verificar status do som ao carregar
-        console.log('🔊 Status do som:', notificationService.isSoundOn());
-
-        // Garantir que o som está ativado
-        if (!notificationService.isSoundOn()) {
-            notificationService.toggleSound(true);
-            setSoundEnabled(true);
-            console.log('🔊 Som ativado pelo MyOrders');
-        }
-    }, []);
+    
+    // 🔥 USAR REF PARA MANTER O ESTADO ANTERIOR
+    const previousOrdersRef = useRef<Order[]>([]);
+    const isFirstLoadRef = useRef<boolean>(true);
 
     useEffect(() => {
         if (!user) {
@@ -46,32 +37,34 @@ const MyOrders: React.FC = () => {
         }
 
         setLoading(true);
-        console.log('🔄 Iniciando listener de pedidos para:', user.uid);
 
         const unsubscribe = cartService.onUserOrders(
             user.uid,
             (updatedOrders) => {
-                console.log('📦 Pedidos atualizados:', updatedOrders.length);
-
-                const statusChanges = getStatusChanges(orders, updatedOrders);
-                console.log('🔔 Mudanças de status detectadas:', statusChanges.length);
-
+                
+                const statusChanges = getStatusChanges(previousOrdersRef.current, updatedOrders);
+                
+                // Atualizar o estado
                 setOrders(updatedOrders);
                 setLastUpdated(new Date());
                 setLoading(false);
 
-                statusChanges.forEach(change => {
-                    console.log(`📢 Notificando: Pedido #${change.orderNumber} - ${change.oldStatus} → ${change.newStatus}`);
-                    showStatusNotification(change);
-                });
+                // 🔥 SÓ MOSTRAR NOTIFICAÇÕES SE NÃO FOR O PRIMEIRO CARREGAMENTO
+                if (!isFirstLoadRef.current && statusChanges.length > 0) {
+                    statusChanges.forEach(change => {
+                        showStatusNotification(change);
+                    });
 
-                if (statusChanges.length > 0) {
                     setNotificationCount(prev => prev + statusChanges.length);
                     setUnreadNotifications(prev => [
                         ...prev,
                         ...statusChanges.map(c => c.orderId)
                     ]);
                 }
+
+                // 🔥 ATUALIZAR O REF COM OS NOVOS PEDIDOS
+                previousOrdersRef.current = updatedOrders;
+                isFirstLoadRef.current = false;
             },
             (error) => {
                 console.error('❌ Erro no listener:', error);
@@ -81,7 +74,6 @@ const MyOrders: React.FC = () => {
         );
 
         return () => {
-            console.log('🛑 Listener removido');
             unsubscribe();
         };
     }, [user]);
@@ -136,34 +128,31 @@ const MyOrders: React.FC = () => {
         const label = statusLabels[change.newStatus] || change.newStatus;
         const icon = statusIcons[change.newStatus] || '📢';
 
-        console.log(`🔔 Mostrando notificação: ${label}`);
-        console.log(`🔊 Sound enabled: ${soundEnabled}`);
-
-        // 🔔 NOTIFICAÇÃO COM SOM - GARANTIR QUE sound: true
         notificationService.showNotification(
             `Pedido #${change.orderNumber}: ${label}`,
             {
-                type: change.newStatus === 'cancelled' ? 'error' :
-                    change.newStatus === 'delivered' ? 'success' : 'info',
+                type: change.newStatus === 'cancelled' ? 'error' : 
+                       change.newStatus === 'delivered' ? 'success' : 'info',
                 duration: 8000,
                 icon: icon,
-                sound: true, 
+                sound: true,
                 onClick: () => {
-                    console.log(`👆 Clique na notificação: ${change.orderId}`);
                     window.location.href = `/order-confirmation/${change.orderId}`;
                 }
             }
         );
 
-        // Também tentar notificação do navegador
+        // Notificação do navegador
         if ('Notification' in window && Notification.permission === 'granted') {
             try {
-                const options: any = {
-                    body: `Status atualizado: ${label}`,
-                    icon: '/favicon.ico',
-                    vibrate: [200, 100, 200],
-                };
-                const notification = new Notification(`🛒 Pedido #${change.orderNumber}`, options);
+                const notification = new Notification(
+                    `🛒 Pedido #${change.orderNumber}`,
+                    ({
+                        body: `Status atualizado: ${label}`,
+                        icon: '/favicon.ico',
+                        vibrate: [200, 100, 200],
+                    } as any)
+                );
                 setTimeout(() => notification.close(), 8000);
                 notification.onclick = () => {
                     window.focus();
@@ -177,17 +166,16 @@ const MyOrders: React.FC = () => {
 
         // Marcar como lida após mostrar
         setTimeout(() => {
-            setUnreadNotifications(prev =>
+            setUnreadNotifications(prev => 
                 prev.filter(id => id !== change.orderId)
             );
         }, 1000);
     };
-
+    
     // Solicitar permissão para notificações
     useEffect(() => {
         if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission().then(permission => {
-                console.log('📢 Permissão de notificação:', permission);
+            Notification.requestPermission().then(() => {
             });
         }
     }, []);
@@ -330,7 +318,6 @@ const MyOrders: React.FC = () => {
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        {/* Botão de som */}
                         <button
                             onClick={toggleSound}
                             className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
@@ -383,10 +370,11 @@ const MyOrders: React.FC = () => {
                             return (
                                 <div
                                     key={order.id}
-                                    className={`bg-white rounded-xl border p-6 hover:shadow-md transition-all relative ${isUnread
-                                            ? 'border-primary-400 shadow-md bg-primary-50/30'
+                                    className={`bg-white rounded-xl border p-6 hover:shadow-md transition-all relative ${
+                                        isUnread 
+                                            ? 'border-primary-400 shadow-md bg-primary-50/30' 
                                             : 'border-gray-200'
-                                        }`}
+                                    }`}
                                 >
                                     {isUnread && (
                                         <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
