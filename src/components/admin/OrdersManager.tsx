@@ -18,19 +18,21 @@ import {
     Send,
     Loader2,
     AlertTriangle,
-    Download,
+    Eye,
     FileImage,
+    Download,
     X,
-    Eye
+    Shield,
+    Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import {
-    doc,
-    getDoc,
-    updateDoc,
-    serverTimestamp,
-    setDoc,
-    collection,
+import { 
+    doc, 
+    getDoc, 
+    updateDoc, 
+    serverTimestamp, 
+    setDoc, 
+    collection, 
     arrayUnion,
     increment,
     writeBatch
@@ -47,7 +49,7 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
     cancelled: [],
 };
 
-// Histórico de status com cores
+// Histórico de status
 const STATUS_HISTORY: Record<string, { label: string; color: string; icon: any }> = {
     awaiting_payment: { label: 'Aguardando Pagamento', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
     paid: { label: 'Pago', color: 'bg-blue-100 text-blue-700', icon: CheckCircle },
@@ -55,6 +57,57 @@ const STATUS_HISTORY: Record<string, { label: string; color: string; icon: any }
     shipped: { label: 'Enviado', color: 'bg-cyan-100 text-cyan-700', icon: Truck },
     delivered: { label: 'Entregue', color: 'bg-green-100 text-green-700', icon: CheckCircle },
     cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-700', icon: XCircle },
+};
+
+// Modal de Visualização de Comprovativo
+const ProofViewerModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    url: string;
+    orderNumber: string;
+}> = ({ isOpen, onClose, url, orderNumber }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] shadow-2xl animate-[modalSlideUp_0.3s_ease]">
+                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <FileImage className="w-5 h-5 text-primary-600" />
+                        Comprovativo - Pedido #{orderNumber}
+                    </h3>
+                    <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+                        <X className="w-5 h-5 text-gray-500" />
+                    </button>
+                </div>
+                <div className="p-4 overflow-y-auto max-h-[70vh]">
+                    {url.match(/\.(pdf)$/i) ? (
+                        <iframe src={url} className="w-full h-[500px] rounded-lg" title="Comprovativo PDF" />
+                    ) : (
+                        <img src={url} alt="Comprovativo" className="w-full rounded-lg" />
+                    )}
+                </div>
+                <div className="p-4 border-t border-gray-200 flex gap-3">
+                    <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                    >
+                        <Download className="w-4 h-4" />
+                        Baixar
+                    </a>
+                    <button 
+                        onClick={onClose} 
+                        className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // Modal de Confirmação
@@ -67,7 +120,8 @@ const ConfirmModal: React.FC<{
     loading: boolean;
     confirmText?: string;
     cancelText?: string;
-}> = ({ isOpen, onClose, onConfirm, title, message, loading, confirmText = 'Confirmar', cancelText = 'Cancelar' }) => {
+    warning?: string;
+}> = ({ isOpen, onClose, onConfirm, title, message, loading, confirmText = 'Confirmar', cancelText = 'Cancelar', warning }) => {
     if (!isOpen) return null;
 
     return (
@@ -76,12 +130,22 @@ const ConfirmModal: React.FC<{
             <div className="relative bg-white rounded-2xl max-w-md w-full shadow-2xl animate-[modalSlideUp_0.3s_ease]">
                 <div className="p-6">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-yellow-100 rounded-full">
-                            <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                        <div className={`p-2 ${warning ? 'bg-yellow-100' : 'bg-blue-100'} rounded-full`}>
+                            {warning ? (
+                                <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                            ) : (
+                                <Shield className="w-6 h-6 text-blue-600" />
+                            )}
                         </div>
                         <h3 className="text-lg font-bold text-gray-900">{title}</h3>
                     </div>
                     <p className="text-gray-600 mb-6">{message}</p>
+                    {warning && (
+                        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-yellow-700">{warning}</p>
+                        </div>
+                    )}
                     <div className="flex gap-3">
                         <button
                             onClick={onClose}
@@ -120,20 +184,21 @@ const OrdersManager: React.FC = () => {
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [updating, setUpdating] = useState<string | null>(null);
     const [viewingProof, setViewingProof] = useState<{ orderId: string; url: string } | null>(null);
-
-
+    
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
         orderId: string;
         newStatus: string;
         oldStatus: string;
         orderNumber: string;
+        hasProof: boolean;
     }>({
         isOpen: false,
         orderId: '',
         newStatus: '',
         oldStatus: '',
         orderNumber: '',
+        hasProof: false,
     });
 
     useEffect(() => {
@@ -176,21 +241,31 @@ const OrdersManager: React.FC = () => {
     };
 
     const openConfirmModal = (orderId: string, newStatus: string, oldStatus: string, orderNumber: string) => {
-        const order = orders.find(o => o.id === orderId);
-        if (order && !order.paymentProof && newStatus !== 'cancelled') {
-            toast.error('Aguardando comprovativo de pagamento');
-            return;
-        }
         if (!isTransitionAllowed(oldStatus, newStatus)) {
             toast.error(`Não é possível mudar de "${STATUS_HISTORY[oldStatus]?.label || oldStatus}" para "${STATUS_HISTORY[newStatus]?.label || newStatus}"`);
             return;
         }
+
+        // 🔥 VERIFICAR SE TEM COMPROVATIVO
+        const order = orders.find(o => o.id === orderId);
+        const hasProof = !!order?.paymentProof;
+
+        // 🔥 BLOQUEAR SE NÃO TIVER COMPROVATIVO E ESTIVER TENTANDO MUDAR PARA "paid"
+        if (newStatus === 'paid' && !hasProof) {
+            toast.error('Cliente não enviou comprovativo de pagamento', {
+                icon: <AlertCircle className="w-5 h-5 text-red-500" />,
+                duration: 5000,
+            });
+            return;
+        }
+
         setConfirmModal({
             isOpen: true,
             orderId,
             newStatus,
             oldStatus,
             orderNumber,
+            hasProof,
         });
     };
 
@@ -205,29 +280,37 @@ const OrdersManager: React.FC = () => {
             if (!orderSnap.exists()) {
                 toast.error('Pedido não encontrado');
                 setUpdating(null);
-                setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '' });
+                setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '', hasProof: false });
                 return;
             }
 
             const orderData = orderSnap.data() as Record<string, any>;
             const now = new Date().toISOString();
 
-            // 🔥 CORRIGIDO: Criar objeto de histórico sem serverTimestamp()
+            // 🔥 Registrar validação
             const historyEntry = {
                 from: oldStatus,
                 to: newStatus,
                 changedAt: now,
                 changedBy: user?.uid || 'unknown',
                 changedByName: user?.name || 'Sistema',
+                validated: newStatus === 'paid' ? true : false,
+                validatedBy: newStatus === 'paid' ? user?.uid : null,
+                validatedByName: newStatus === 'paid' ? user?.name : null,
             };
 
-            // 🔥 Atualizar com histórico e auditoria
+            // 🔥 Atualizar com validação
             await updateDoc(orderRef, {
                 status: newStatus,
                 updatedAt: serverTimestamp(),
                 updatedBy: user?.uid || 'unknown',
                 updatedByName: user?.name || 'Sistema',
                 statusHistory: arrayUnion(historyEntry),
+                ...(newStatus === 'paid' && {
+                    validatedBy: user?.uid,
+                    validatedByName: user?.name,
+                    validatedAt: now,
+                })
             });
 
             // Se cancelado, devolver estoque
@@ -249,6 +332,14 @@ const OrdersManager: React.FC = () => {
             }
 
             toast.success(`Status atualizado para: ${STATUS_HISTORY[newStatus]?.label || newStatus}`);
+            
+            if (newStatus === 'paid') {
+                toast.success(`✅ Pagamento validado por ${user?.name || 'Administrador'}`, {
+                    icon: <Check className="w-5 h-5 text-green-500" />,
+                    duration: 5000,
+                });
+            }
+
             toast.success(`Notificação enviada para o cliente`, {
                 icon: <Send className="w-5 h-5" />,
                 duration: 3000,
@@ -256,7 +347,7 @@ const OrdersManager: React.FC = () => {
 
         } catch (error: any) {
             console.error('Erro ao atualizar status:', error);
-
+            
             if (error.code === 'permission-denied') {
                 toast.error('Sem permissão para alterar status');
             } else if (error.code === 'not-found') {
@@ -266,7 +357,7 @@ const OrdersManager: React.FC = () => {
             }
         } finally {
             setUpdating(null);
-            setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '' });
+            setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '', hasProof: false });
         }
     };
 
@@ -283,53 +374,6 @@ const OrdersManager: React.FC = () => {
         } catch (error) {
             console.error('Erro ao restaurar estoque:', error);
         }
-    };
-
-    const ProofViewerModal: React.FC<{
-        isOpen: boolean;
-        onClose: () => void;
-        url: string;
-        orderNumber: string;
-    }> = ({ isOpen, onClose, url, orderNumber }) => {
-        if (!isOpen) return null;
-
-        return (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-                <div className="relative bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] shadow-2xl animate-[modalSlideUp_0.3s_ease]">
-                    <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                            <FileImage className="w-5 h-5 text-primary-600" />
-                            Comprovativo - Pedido #{orderNumber}
-                        </h3>
-                        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
-                            <X className="w-5 h-5 text-gray-500" />
-                        </button>
-                    </div>
-                    <div className="p-4 overflow-y-auto max-h-[70vh]">
-                        {url.match(/\.(pdf)$/i) ? (
-                            <iframe src={url} className="w-full h-[500px] rounded-lg" />
-                        ) : (
-                            <img src={url} alt="Comprovativo" className="w-full rounded-lg" />
-                        )}
-                    </div>
-                    <div className="p-4 border-t border-gray-200 flex gap-3">
-                        <a
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                        >
-                            <Download className="w-4 h-4" />
-                            Baixar
-                        </a>
-                        <button onClick={onClose} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
-                            Fechar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
     };
 
     const saveNotificationForClient = async (userId: string, notification: any) => {
@@ -438,13 +482,22 @@ const OrdersManager: React.FC = () => {
             {/* Modal de Confirmação */}
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
-                onClose={() => setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '' })}
+                onClose={() => setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '', hasProof: false })}
                 onConfirm={executeStatusChange}
                 title="Confirmar Mudança de Status"
                 message={`Deseja alterar o pedido #${confirmModal.orderNumber} de "${STATUS_HISTORY[confirmModal.oldStatus]?.label || confirmModal.oldStatus}" para "${STATUS_HISTORY[confirmModal.newStatus]?.label || confirmModal.newStatus}"?`}
                 loading={updating === confirmModal.orderId}
                 confirmText="Confirmar"
                 cancelText="Cancelar"
+                warning={confirmModal.newStatus === 'paid' ? 'Ao confirmar, o pagamento será validado e o cliente será notificado.' : undefined}
+            />
+
+            {/* Modal de Visualização de Comprovativo */}
+            <ProofViewerModal
+                isOpen={!!viewingProof}
+                onClose={() => setViewingProof(null)}
+                url={viewingProof?.url || ''}
+                orderNumber={orders.find(o => o.id === viewingProof?.orderId)?.orderNumber || ''}
             />
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -508,39 +561,31 @@ const OrdersManager: React.FC = () => {
             {/* Orders Table */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[700px]">
+                    <table className="w-full min-w-[900px]">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">
-                                    <div className="flex items-center gap-1">
-                                        <Package className="w-3.5 h-3.5" />
-                                        Pedido
-                                    </div>
+                                    <Package className="w-3.5 h-3.5 inline mr-1" />
+                                    Pedido
                                 </th>
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">
-                                    <div className="flex items-center gap-1">
-                                        <User className="w-3.5 h-3.5" />
-                                        Cliente
-                                    </div>
+                                    <User className="w-3.5 h-3.5 inline mr-1" />
+                                    Cliente
                                 </th>
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 hidden sm:table-cell">
-                                    <div className="flex items-center gap-1">
-                                        <Calendar className="w-3.5 h-3.5" />
-                                        Data
-                                    </div>
+                                    <Calendar className="w-3.5 h-3.5 inline mr-1" />
+                                    Data
                                 </th>
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">
-                                    <div className="flex items-center gap-1">
-                                        <DollarSign className="w-3.5 h-3.5" />
-                                        Total
-                                    </div>
+                                    <DollarSign className="w-3.5 h-3.5 inline mr-1" />
+                                    Total
                                 </th>
-                                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">Status</th>
+                                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">
+                                    Status
+                                </th>
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 hidden lg:table-cell">
-                                    <div className="flex items-center gap-1">
-                                        <FileImage className="w-3.5 h-3.5" />
-                                        Comprovativo
-                                    </div>
+                                    <FileImage className="w-3.5 h-3.5 inline mr-1" />
+                                    Comprovativo
                                 </th>
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">Ações</th>
                             </tr>
@@ -548,7 +593,7 @@ const OrdersManager: React.FC = () => {
                         <tbody>
                             {filteredOrders.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="text-center py-8 text-gray-500">
+                                    <td colSpan={7} className="text-center py-8 text-gray-500">
                                         <AlertCircle className="w-12 h-12 mx-auto text-gray-300 mb-2" />
                                         <p>Nenhum pedido encontrado</p>
                                     </td>
@@ -556,10 +601,13 @@ const OrdersManager: React.FC = () => {
                             ) : (
                                 filteredOrders.map(order => {
                                     const isUpdating = updating === order.id;
+                                    const hasProof = !!order.paymentProof;
+                                    const isPaidOrProcessing = order.status === 'paid' || order.status === 'processing';
+
                                     return (
                                         <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                                             <td className="py-3 px-3 sm:px-4">
-                                                <span className="font-medium truncate max-w-[10px] sm:max-w-[50px] text-gray-900 text-sm">
+                                                <span className="font-medium text-gray-900 text-sm">
                                                     #{order.orderNumber}
                                                 </span>
                                             </td>
@@ -586,16 +634,19 @@ const OrdersManager: React.FC = () => {
                                                 </span>
                                             </td>
                                             <td className="py-3 px-3 sm:px-4 hidden lg:table-cell">
-                                                {order.paymentProof ? (
+                                                {hasProof ? (
                                                     <button
-                                                        onClick={() => setViewingProof({ orderId: order.id, url: order.paymentProof })}
-                                                        className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        onClick={() => setViewingProof({ orderId: order.id, url: order.paymentProof! })}
+                                                        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                                                         title="Ver comprovativo"
                                                     >
-                                                        <Eye className="w-4 h-4" />
+                                                        <Eye className="w-3.5 h-3.5" />
+                                                        Ver
                                                     </button>
                                                 ) : (
-                                                    <span className="text-xs text-gray-400">Não enviado</span>
+                                                    <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">
+                                                        Não enviado
+                                                    </span>
                                                 )}
                                             </td>
                                             <td className="py-3 px-3 sm:px-4">
@@ -608,7 +659,7 @@ const OrdersManager: React.FC = () => {
                                                             order.status,
                                                             order.orderNumber || order.id.slice(-8)
                                                         )}
-                                                        disabled={isUpdating}
+                                                        disabled={isUpdating || (order.status === 'delivered' || order.status === 'cancelled')}
                                                         className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:opacity-50"
                                                     >
                                                         {statusOptions.filter(opt => opt.value !== 'all').map(opt => (
@@ -620,6 +671,18 @@ const OrdersManager: React.FC = () => {
                                                     {isUpdating && (
                                                         <Loader2 className="animate-spin w-4 h-4 text-primary-600" />
                                                     )}
+                                                    {!hasProof && order.status === 'awaiting_payment' && (
+                                                        <span className="text-xs text-yellow-600 flex items-center gap-1">
+                                                            <AlertCircle className="w-3 h-3" />
+                                                            Aguardando comprovativo
+                                                        </span>
+                                                    )}
+                                                    {isPaidOrProcessing && (
+                                                        <span className="text-xs text-green-600 flex items-center gap-1">
+                                                            <Check className="w-3 h-3" />
+                                                            Validado
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -630,14 +693,7 @@ const OrdersManager: React.FC = () => {
                     </table>
                 </div>
             </div>
-            <ProofViewerModal
-                isOpen={!!viewingProof}
-                onClose={() => setViewingProof(null)}
-                url={viewingProof?.url || ''}
-                orderNumber={orders.find(o => o.id === viewingProof?.orderId)?.orderNumber || ''}
-            />
         </div>
-
     );
 };
 
