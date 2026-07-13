@@ -29,7 +29,6 @@ class NotificationService {
             this.pendingSounds = [];
           }
         } catch (e) {
-          console.warn('AudioContext não suportado');
         }
       }
     };
@@ -87,7 +86,6 @@ class NotificationService {
         this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         this.isInitialized = true;
       } catch (e) {
-        console.warn('Não foi possível inicializar AudioContext');
       }
     }
   }

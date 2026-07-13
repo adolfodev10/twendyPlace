@@ -30,7 +30,6 @@ if (isFirebaseConfigured) {
   db = getFirestore(app);
   storage = getStorage(app);
 } else {
-  console.warn('⚠️ Firebase não configurado. Configure as variáveis de ambiente.');
   auth = {} as Auth;
   db = {} as Firestore;
   storage = {} as FirebaseStorage;
