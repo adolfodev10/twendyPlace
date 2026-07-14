@@ -313,9 +313,12 @@ const OrdersManager: React.FC = () => {
                 })
             });
 
+
             // Se cancelado, devolver estoque
             if (newStatus === 'cancelled' && orderData.items) {
-                await restoreStock(orderData.items);
+                if(oldStatus !== 'paid'){
+                    await restoreStock(orderData.items);
+                }
             }
 
             // Notificar cliente
