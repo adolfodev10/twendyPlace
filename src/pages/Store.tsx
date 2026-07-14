@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { productService } from '../services/productService';
+import { partnerService } from '../services/partnerService';
 import { Product } from '../types';
 import Header from '../components/common/Header';
 import ProductGrid from '../components/store/ProductGrid';
@@ -22,7 +23,7 @@ const Store: React.FC = () => {
     search: '',
     category: 'all',
     minPrice: 0,
-    maxPrice: 10000,
+    maxPrice: 50000,
     rating: 0,
     brands: [] as string[],
   });
@@ -33,12 +34,22 @@ const Store: React.FC = () => {
       setError(null);
       
       try {
-        const data = await productService.getAllProducts();
+        // 🔥 BUSCAR PRODUTOS NORMAIS E DE PARCEIROS
+        const [normalProducts, partnerProducts] = await Promise.all([
+          productService.getAllProducts(),
+          partnerService.getPartnerProductsForStore()
+        ]);
         
-        // Remover duplicatas
-        const uniqueProducts = data.filter((product, index, self) => 
+        // 🔥 COMBINAR PRODUTOS
+        let allProducts = [...normalProducts, ...partnerProducts];
+        
+        // 🔥 REMOVER DUPLICATAS (por nome)
+        const uniqueProducts = allProducts.filter((product, index, self) => 
           index === self.findIndex(p => p.name === product.name)
         );
+        
+        // 🔥 ORDENAR POR NOME
+        uniqueProducts.sort((a, b) => a.name.localeCompare(b.name));
         
         setProducts(uniqueProducts);
         setFilteredProducts(uniqueProducts);

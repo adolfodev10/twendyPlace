@@ -363,23 +363,51 @@ export const partnerService = {
             return { success: false, error: error.message };
         }
     },
-
     /**
      * 🔥 BUSCAR PRODUTOS DE PARCEIROS PARA A LOJA
      */
     async getPartnerProductsForStore(): Promise<any[]> {
         try {
+            // 🔥 Buscar apenas produtos de parceiros
             const q = query(
                 collection(db, 'products'),
-                where('isPartnerProduct', '==', true),
-                where('stock', '>', 0),
-                orderBy('name', 'asc')
+                where('isPartnerProduct', '==', true)
             );
             const snapshot = await getDocs(q);
-            return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
+
+            // 🔥 Mapear produtos com a estrutura correta para a loja
+            let products = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    // 🔥 IMPORTANTE: Usar 'name' que existe no produto
+                    name: data.name || data.productName || 'Produto sem nome',
+                    price: data.partnerPrice || data.price || 0,
+                    stock: data.stock || 0,
+                    category: data.category || '',
+                    brand: data.brand || '',
+                    rating: data.rating || 0,
+                    image: data.image || '',
+                    description: data.description || '',
+                    // 🔥 Campos de parceiro
+                    isPartnerProduct: true,
+                    partnerId: data.partnerId,
+                    partnerPrice: data.partnerPrice,
+                    originalPrice: data.originalPrice || data.price,
+                    commissionRate: data.commissionRate || 15,
+                };
+            });
+
+            // 🔥 Filtrar produtos com estoque disponível
+            products = products.filter((p: any) => (p.stock ?? 0) > 0);
+
+            // 🔥 Ordenar por nome
+            products.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+            console.log(`✅ Produtos de parceiros: ${products.length} encontrados`);
+            console.log('🔍 Primeiro produto:', products[0]);
+
+            return products;
         } catch (error) {
             console.error('Erro ao buscar produtos de parceiros:', error);
             return [];
