@@ -12,6 +12,65 @@ export interface User {
   updatedAt?: Date;
 }
 
+// Adicione no final do arquivo
+
+export interface Partner {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  documentId: string; // NIF/BI
+  address: string;
+  city: string;
+  commissionRate: number; // Percentagem da comissão (ex: 15 = 15%)
+  status: 'active' | 'inactive' | 'pending';
+  totalSales: number;
+  totalCommission: number;
+  totalProducts: number;
+  products: string[]; // IDs dos produtos
+  createdAt: Date;
+  updatedAt: Date;
+  approvedAt?: Date;
+  approvedBy?: string;
+  bankInfo?: {
+    bank: string;
+    account: string;
+    iban: string;
+  };
+  logo?: string;
+  description?: string;
+}
+
+export interface PartnerProduct {
+  id: string;
+  partnerId: string;
+  productId: string;
+  productName: string;
+  productPrice: number;
+  productImage: string;
+  partnerPrice: number;
+  commission: number; // Valor da comissão calculado
+  status: 'active' | 'inactive';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PartnerCommission {
+  id: string;
+  partnerId: string;
+  orderId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  salePrice: number;
+  commissionRate: number;
+  commissionValue: number;
+  status: 'pending' | 'paid' | 'cancelled';
+  createdAt: Date;
+  paidAt?: Date;
+}
+
 export interface Product {
   id: string;
   name: string;
