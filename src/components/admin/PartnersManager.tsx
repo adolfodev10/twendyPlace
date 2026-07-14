@@ -26,6 +26,7 @@ import {
     User
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PartnerProductCreator from './PartnerProductCreator';
 
 // Modal de Visualização de Produtos do Parceiro
 const PartnerProductsModal: React.FC<{
@@ -299,6 +300,7 @@ const PartnersManager: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showProductsModal, setShowProductsModal] = useState(false);
     const [showAddProductModal, setShowAddProductModal] = useState(false);
+    const [showProductCreator, setShowProductCreator] = useState(false);
     const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
     const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null);
     const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
@@ -832,6 +834,13 @@ const PartnersManager: React.FC = () => {
                                                 <Plus className="w-4 h-4" />
                                                 Adicionar Produto
                                             </button>
+                                            <button
+                                                onClick={() => { setSelectedPartner(partner); setShowProductCreator(true); }}
+                                                className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                                Criar Produto
+                                            </button>
                                             <button onClick={() => handleOpenModal(partner)} className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
                                                 <Edit className="w-4 h-4" />
                                                 Editar
@@ -848,6 +857,12 @@ const PartnersManager: React.FC = () => {
                     })
                 )}
             </div>
+            <PartnerProductCreator
+                isOpen={showProductCreator}
+                onClose={() => setShowProductCreator(false)}
+                onSuccess={loadPartners}
+                partnerId={selectedPartner?.id}
+            />
         </div>
     );
 };
