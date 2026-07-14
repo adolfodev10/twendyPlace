@@ -69,7 +69,6 @@ export const partnerService = {
         } catch (error: any) {
             // 🔥 FALLBACK: Se o índice estiver em construção, buscar sem orderBy
             if (error.message?.includes('index is currently building')) {
-                console.log('⏳ Índice em construção, usando fallback...');
 
                 try {
                     const collectionRef = collection(db, 'partners');
@@ -89,7 +88,6 @@ export const partnerService = {
                     // Ordenar no cliente
                     partners.sort((a, b) => a.name.localeCompare(b.name));
 
-                    console.log(`✅ Fallback funcionou: ${partners.length} parceiros`);
                     return partners;
                 } catch (fallbackError) {
                     console.error('Erro no fallback:', fallbackError);
@@ -471,7 +469,6 @@ export const partnerService = {
                 (error) => {
                     // 🔥 Se o índice estiver em construção, tentar sem orderBy
                     if (error.message?.includes('index is currently building')) {
-                        console.log('⏳ Índice em construção no listener, usando fallback...');
 
                         try {
                             const q2 = status

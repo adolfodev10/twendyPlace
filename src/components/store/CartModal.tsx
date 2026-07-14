@@ -24,12 +24,12 @@ const ConfirmModal: React.FC<{
   uploadProgress: number;
   isUploading: boolean;
   uploadedFileURL: string | null;
-}> = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  total, 
-  items, 
+}> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  total,
+  items,
   loading,
   onFileUpload,
   uploadedFile,
@@ -37,152 +37,151 @@ const ConfirmModal: React.FC<{
   isUploading,
   uploadedFileURL
 }) => {
-  if (!isOpen) return null;
+    if (!isOpen) return null;
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl animate-[modalSlideUp_0.3s_ease] max-h-[90vh] overflow-y-auto">
-        <div className="text-center">
-          <div className="w-20 h-20 mx-auto bg-blue-50 rounded-full flex items-center justify-center mb-4">
-            <CreditCard className="w-10 h-10 text-primary-600" />
-          </div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirmar Pedido</h3>
-          <p className="text-gray-500 mb-6">
-            Confirme seu pedido de <strong className="text-primary-600">Kz {total.toFixed(2)}</strong>
-          </p>
-
-          <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left max-h-40 overflow-y-auto">
-            {items.map((item, index) => (
-              <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
-                <span className="text-sm text-gray-700">{item.name}</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {item.qty}x Kz {(item.price * item.qty).toFixed(2)}
-                </span>
-              </div>
-            ))}
-            <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-gray-300">
-              <span className="font-bold text-gray-900">Total</span>
-              <span className="font-bold text-primary-600 text-lg">Kz {total.toFixed(2)}</span>
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="relative bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl animate-[modalSlideUp_0.3s_ease] max-h-[90vh] overflow-y-auto">
+          <div className="text-center">
+            <div className="w-20 h-20 mx-auto bg-blue-50 rounded-full flex items-center justify-center mb-4">
+              <CreditCard className="w-10 h-10 text-primary-600" />
             </div>
-          </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirmar Pedido</h3>
+            <p className="text-gray-500 mb-6">
+              Confirme seu pedido de <strong className="text-primary-600">Kz {total.toFixed(2)}</strong>
+            </p>
 
-          {/* Upload de Comprovativo */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2 text-left">
-              Comprovativo de Pagamento *
-            </label>
-            
-            {!uploadedFileURL ? (
-              <div 
-                className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
-                  uploadedFile ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary-400'
-                }`}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,.pdf"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      onFileUpload(e.target.files[0]);
-                    }
-                  }}
-                />
-                {uploadedFile ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <File className="w-8 h-8 text-green-500" />
-                    <div>
-                      <p className="text-sm font-medium text-green-700">{uploadedFile.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {(uploadedFile.size / 1024).toFixed(0)} KB
-                      </p>
-                    </div>
-                    {uploadProgress > 0 && uploadProgress < 100 && (
-                      <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                        <div 
-                          className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <Upload className="w-10 h-10 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-600">Clique para fazer upload do comprovativo</p>
-                    <p className="text-xs text-gray-400 mt-1">PNG, JPG ou PDF (máx. 5MB)</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
-                <Check className="w-6 h-6 text-green-500" />
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium text-green-700">Comprovativo enviado!</p>
-                  <button 
-                    onClick={() => window.open(uploadedFileURL, '_blank')}
-                    className="text-xs text-primary-600 hover:text-primary-700"
-                  >
-                    Ver comprovativo
-                  </button>
+            <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left max-h-40 overflow-y-auto">
+              {items.map((item, index) => (
+                <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
+                  <span className="text-sm text-gray-700">{item.name}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {item.qty}x Kz {(item.price * item.qty).toFixed(2)}
+                  </span>
                 </div>
+              ))}
+              <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-gray-300">
+                <span className="font-bold text-gray-900">Total</span>
+                <span className="font-bold text-primary-600 text-lg">Kz {total.toFixed(2)}</span>
               </div>
+            </div>
+
+            {/* Upload de Comprovativo */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2 text-left">
+                Comprovativo de Pagamento *
+              </label>
+
+              {!uploadedFileURL ? (
+                <div
+                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${uploadedFile ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary-400'
+                    }`}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        onFileUpload(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  {uploadedFile ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <File className="w-8 h-8 text-green-500" />
+                      <div>
+                        <p className="text-sm font-medium text-green-700">{uploadedFile.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {(uploadedFile.size / 1024).toFixed(0)} KB
+                        </p>
+                      </div>
+                      {uploadProgress > 0 && uploadProgress < 100 && (
+                        <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                          <div
+                            className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload className="w-10 h-10 mx-auto text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">Clique para fazer upload do comprovativo</p>
+                      <p className="text-xs text-gray-400 mt-1">PNG, JPG ou PDF (máx. 5MB)</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+                  <Check className="w-6 h-6 text-green-500" />
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium text-green-700">Comprovativo enviado!</p>
+                    <button
+                      onClick={() => window.open(uploadedFileURL, '_blank')}
+                      className="text-xs text-primary-600 hover:text-primary-700"
+                    >
+                      Ver comprovativo
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={onConfirm}
+                disabled={loading || !uploadedFileURL || isUploading}
+                className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processando...
+                  </>
+                ) : isUploading ? (
+                  <>
+                    <Upload className="w-4 h-4 animate-pulse" />
+                    Enviando...
+                  </>
+                ) : (
+                  'Confirmar Pedido'
+                )}
+              </button>
+            </div>
+            {!uploadedFileURL && !isUploading && (
+              <p className="mt-2 text-xs text-red-500">
+                <AlertCircle className="w-3 h-3 inline mr-1" />
+                É necessário enviar o comprovativo de pagamento
+              </p>
             )}
           </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={loading || !uploadedFileURL || isUploading}
-              className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Processando...
-                </>
-              ) : isUploading ? (
-                <>
-                  <Upload className="w-4 h-4 animate-pulse" />
-                  Enviando...
-                </>
-              ) : (
-                'Confirmar Pedido'
-              )}
-            </button>
-          </div>
-          {!uploadedFileURL && !isUploading && (
-            <p className="mt-2 text-xs text-red-500">
-              <AlertCircle className="w-3 h-3 inline mr-1" />
-              É necessário enviar o comprovativo de pagamento
-            </p>
-          )}
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
   const { items, removeItem, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -209,50 +208,50 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     setShowConfirmModal(true);
   };
 
-// Substitua a função handleFileUpload por esta:
+  // Substitua a função handleFileUpload por esta:
 
-const handleFileUpload = async (file: File) => {
-  if (file.size > 5 * 1024 * 1024) {
-    toast.error('Arquivo muito grande. Máximo 5MB.');
-    return;
-  }
-
-  const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-  if (!validTypes.includes(file.type)) {
-    toast.error('Formato inválido. Use PNG, JPG ou PDF.');
-    return;
-  }
-
-  setUploadedFile(file);
-  setIsUploading(true);
-  setUploadProgress(0);
-
-  try {
-    // 🔥 USAR IMGBB - NÃO PRECISA DE CORS!
-    const formData = new FormData();
-    formData.append('image', file);
-    
-    const response = await fetch('https://api.imgbb.com/1/upload?key=4e470b576522a10c52b87edf23905cb3', {
-      method: 'POST',
-      body: formData,
-    });
-
-    const data = await response.json();
-    
-    if (data.success) {
-      setUploadedFileURL(data.data.url);
-      setUploadProgress(100);
-      toast.success('Comprovativo enviado com sucesso!');
-    } else {
-      toast.error('Erro ao enviar comprovativo. Tente novamente.');
+  const handleFileUpload = async (file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Arquivo muito grande. Máximo 5MB.');
+      return;
     }
-  } catch (error) {
-    console.error('Erro no upload:', error);
-    toast.error('Erro ao enviar comprovativo. Tente novamente.');
-  } finally {
-    setIsUploading(false);
-  }
-};
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Formato inválido. Use PNG, JPG ou PDF.');
+      return;
+    }
+
+    setUploadedFile(file);
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // 🔥 USAR IMGBB - NÃO PRECISA DE CORS!
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch('https://api.imgbb.com/1/upload?key=4e470b576522a10c52b87edf23905cb3', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUploadedFileURL(data.data.url);
+        setUploadProgress(100);
+        toast.success('Comprovativo enviado com sucesso!');
+      } else {
+        toast.error('Erro ao enviar comprovativo. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      toast.error('Erro ao enviar comprovativo. Tente novamente.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleConfirmOrder = async () => {
     if (!uploadedFileURL) {
@@ -305,7 +304,7 @@ const handleFileUpload = async (file: File) => {
     <>
       <div className="fixed inset-0 z-50 overflow-hidden">
         <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-        
+
         <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl">
           <div className="flex h-full flex-col">
             {/* Header */}
