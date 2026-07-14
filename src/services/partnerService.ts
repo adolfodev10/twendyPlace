@@ -20,10 +20,130 @@ import {
 import { db } from './firebase';
 import { Partner, PartnerProduct } from '../types';
 
+
+
 export const partnerService = {
     /**
      * 🔥 CRIAR PARCEIRO
      */
+
+    // Adicione estas funções ao partnerService.ts
+
+/**
+ * 🔥 CRIAR PRODUTO DIRETAMENTE PARA UM PARCEIRO
+ */
+async createPartnerProduct(
+    partnerId: string,
+    productData: {
+        name: string;
+        price: number;
+        category: string;
+        brand: string;
+        rating: number;
+        image: string;
+        description: string;
+        stock: number;
+        partnerPrice?: number;
+        commissionRate?: number;
+    }
+): Promise<{ success: boolean; productId?: string; error?: string }> {
+    try {
+        // 1. Criar o produto na coleção principal
+        const { productService } = await import('./productService');
+        
+        const newProduct = {
+            name: productData.name,
+            price: productData.partnerPrice || productData.price,
+            stock: productData.stock || 0,
+            category: productData.category,
+            brand: productData.brand,
+            rating: productData.rating || 5,
+            image: productData.image,
+            description: productData.description || '',
+            partnerId: partnerId,
+            isPartnerProduct: true,
+            partnerPrice: productData.partnerPrice || productData.price,
+            originalPrice: productData.price,
+            commissionRate: productData.commissionRate || 15,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+
+        const result = await productService.addProduct(newProduct);
+        
+        if (!result.success || !result.id) {
+            return { success: false, error: result.error || 'Erro ao criar produto' };
+        }
+
+        // 2. Associar ao parceiro
+        await this.addProductToPartner(
+            partnerId,
+            result.id,
+            productData.partnerPrice || productData.price,
+            productData.commissionRate || 15
+        );
+
+        return { success: true, productId: result.id };
+    } catch (error: any) {
+        console.error('Erro ao criar produto do parceiro:', error);
+        return { success: false, error: error.message };
+    }
+},
+
+/**
+ * 🔥 BUSCAR PRODUTOS DE PARCEIROS PARA A LOJA
+ */
+async getPartnerProductsForStore(): Promise<any[]> {
+    try {
+        const q = query(
+            collection(db, 'products'),
+            where('isPartnerProduct', '==', true),
+            where('stock', '>', 0),
+            orderBy('name', 'asc')
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
+    } catch (error) {
+        console.error('Erro ao buscar produtos de parceiros:', error);
+        return [];
+    }
+},
+
+/**
+ * 🔥 CALCULAR COMISSÃO DE UMA VENDA DE PARCEIRO
+ */
+async calculatePartnerCommission(
+    productId: string,
+    salePrice: number,
+    quantity: number
+): Promise<{ partnerId: string | null; commission: number; rate: number }> {
+    try {
+        const productDoc = await getDoc(doc(db, 'products', productId));
+        if (!productDoc.exists()) {
+            return { partnerId: null, commission: 0, rate: 0 };
+        }
+
+        const product = productDoc.data();
+        if (!product.isPartnerProduct || !product.partnerId) {
+            return { partnerId: null, commission: 0, rate: 0 };
+        }
+
+        const rate = product.commissionRate || 15;
+        const commission = (salePrice * rate) / 100;
+
+        return {
+            partnerId: product.partnerId,
+            commission: commission * quantity,
+            rate: rate,
+        };
+    } catch (error) {
+        console.error('Erro ao calcular comissão:', error);
+        return { partnerId: null, commission: 0, rate: 0 };
+    }
+},
     async createPartner(data: Omit<Partner, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ success: boolean; id?: string; error?: string }> {
         try {
             const partnerData = {
