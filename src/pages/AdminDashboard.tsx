@@ -7,6 +7,7 @@ import ClientsManager from '../components/admin/ClientsManager';
 import ProtectedRoute from '../components/common/ProtectedRoute';
 import Dashboard from '../components/admin/Dashboard';
 import ProofPayment from '../components/admin/ProofPayment';
+import PartnersManager from '../components/admin/PartnersManager';
 
 const AdminDashboard: React.FC = () => {
   return (
@@ -18,6 +19,7 @@ const AdminDashboard: React.FC = () => {
           <Route path="/products" element={<ProductsManager />} />
           <Route path="/clients" element={<ClientsManager />} />
           <Route path="/proofPayment" element={<ProofPayment />} />
+          <Route path="/partners" element={<PartnersManager />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </AdminLayout>

@@ -8,7 +8,8 @@ import {
   LogOut,
   Menu,
   X,
-  FileImage
+  FileImage,
+  Users2
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/authService';
@@ -46,7 +47,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { path: '/admin/orders', icon: ShoppingCart, label: 'Pedidos' },
     { path: '/admin/products', icon: Package, label: 'Produtos' },
     { path: '/admin/clients', icon: Users, label: 'Clientes' },
-    { path: '/admin/proofPayment', icon: FileImage, label: 'Comprovativos' }
+    { path: '/admin/proofPayment', icon: FileImage, label: 'Comprovativos' },
+    { path: '/admin/partners', icon: Users2, label: 'Parceiros' }
   ];
 
   const handleLogout = async () => {
