@@ -16,6 +16,7 @@ const AdminDashboard: React.FC = () => {
           <Route path="/orders" element={<OrdersManager />} />
           <Route path="/products" element={<ProductsManager />} />
           <Route path="/clients" element={<ClientsManager />} />
+          <Route path="/proofPayment" element={<ClientsManager />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </AdminLayout>
