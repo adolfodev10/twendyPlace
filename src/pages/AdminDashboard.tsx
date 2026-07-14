@@ -6,6 +6,7 @@ import ProductsManager from '../components/admin/ProductsManager';
 import ClientsManager from '../components/admin/ClientsManager';
 import ProtectedRoute from '../components/common/ProtectedRoute';
 import Dashboard from '../components/admin/Dashboard';
+import ProofPayment from '../components/admin/ProofPayment';
 
 const AdminDashboard: React.FC = () => {
   return (
@@ -16,7 +17,7 @@ const AdminDashboard: React.FC = () => {
           <Route path="/orders" element={<OrdersManager />} />
           <Route path="/products" element={<ProductsManager />} />
           <Route path="/clients" element={<ClientsManager />} />
-          <Route path="/proofPayment" element={<ClientsManager />} />
+          <Route path="/proofPayment" element={<ProofPayment />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </AdminLayout>
