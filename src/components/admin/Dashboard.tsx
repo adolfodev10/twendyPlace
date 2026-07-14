@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Order } from '../../types';
-import { 
-  ShoppingCart, 
-  Package, 
-  Users, 
+import {
+  ShoppingCart,
+  Package,
+  Users,
   DollarSign,
   TrendingUp,
   Clock,
@@ -26,29 +26,56 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 🔥 FUNÇÃO CORRIGIDA - com verificações de segurança
   const formatDate = (value: unknown): string => {
-    const date = typeof (value as { toDate?: () => Date }).toDate === 'function'
-      ? (value as { toDate: () => Date }).toDate()
-      : value instanceof Date
-        ? value
-        : null;
+    // Se não houver valor, retorna '--'
+    if (!value) return '--';
 
-    if (!date) return '--';
+    try {
+      let date: Date | null = null;
 
-    return date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+      // Verificar se é um Firestore Timestamp com toDate()
+      if (typeof (value as any)?.toDate === 'function') {
+        date = (value as any).toDate();
+      }
+      // Verificar se já é um Date
+      else if (value instanceof Date) {
+        date = value;
+      }
+      // Verificar se é um objeto com seconds (Firestore Timestamp)
+      else if (typeof value === 'object' && (value as any)?.seconds) {
+        date = new Date((value as any).seconds * 1000);
+      }
+      // Verificar se é uma string ou número
+      else if (typeof value === 'string' || typeof value === 'number') {
+        const parsed = new Date(value);
+        if (!isNaN(parsed.getTime())) {
+          date = parsed;
+        }
+      }
+
+      if (!date || isNaN(date.getTime())) {
+        return '--';
+      }
+
+      return date.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Erro ao formatar data:', error);
+      return '--';
+    }
   };
 
   useEffect(() => {
     const loadStats = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         const ordersSnap = await getDocs(collection(db, 'orders'));
         const orders = ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
@@ -64,17 +91,19 @@ const Dashboard: React.FC = () => {
         const clientsSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'customer')));
         const totalClients = clientsSnap.size;
 
+        // 🔥 ORDENAÇÃO CORRIGIDA
         const recentOrders = [...orders]
           .sort((a, b) => {
-            const toMillis = (val: any) => {
+            const getTime = (val: any): number => {
               if (!val) return 0;
-              if (typeof val.toDate === 'function') return val.toDate().getTime();
+              if (typeof val?.toDate === 'function') return val.toDate().getTime();
               if (val instanceof Date) return val.getTime();
               if (typeof val === 'number') return val;
+              if (typeof val === 'object' && val?.seconds) return val.seconds * 1000;
               return 0;
             };
-            const dateA = toMillis(a.createdAt);
-            const dateB = toMillis(b.createdAt);
+            const dateA = getTime(a.createdAt);
+            const dateB = getTime(b.createdAt);
             return dateB - dateA;
           })
           .slice(0, 5);
@@ -99,42 +128,42 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const statCards = [
-    { 
-      label: 'Total de Pedidos', 
-      value: stats.totalOrders, 
-      icon: ShoppingCart, 
+    {
+      label: 'Total de Pedidos',
+      value: stats.totalOrders,
+      icon: ShoppingCart,
       color: 'bg-blue-500',
       textColor: 'text-blue-600',
       bgLight: 'bg-blue-50'
     },
-    { 
-      label: 'Pendentes', 
-      value: stats.pendingOrders, 
-      icon: Clock, 
+    {
+      label: 'Pendentes',
+      value: stats.pendingOrders,
+      icon: Clock,
       color: 'bg-yellow-500',
       textColor: 'text-yellow-600',
       bgLight: 'bg-yellow-50'
     },
-    { 
-      label: 'Produtos', 
-      value: stats.totalProducts, 
-      icon: Package, 
+    {
+      label: 'Produtos',
+      value: stats.totalProducts,
+      icon: Package,
       color: 'bg-green-500',
       textColor: 'text-green-600',
       bgLight: 'bg-green-50'
     },
-    { 
-      label: 'Clientes', 
-      value: stats.totalClients, 
-      icon: Users, 
+    {
+      label: 'Clientes',
+      value: stats.totalClients,
+      icon: Users,
       color: 'bg-purple-500',
       textColor: 'text-purple-600',
       bgLight: 'bg-purple-50'
     },
-    { 
-      label: 'Faturamento', 
-      value: `Kz ${stats.totalRevenue.toFixed(2)}`, 
-      icon: DollarSign, 
+    {
+      label: 'Faturamento',
+      value: `Kz ${stats.totalRevenue.toFixed(2)}`,
+      icon: DollarSign,
       color: 'bg-emerald-500',
       textColor: 'text-emerald-600',
       bgLight: 'bg-emerald-50'
@@ -187,11 +216,11 @@ const Dashboard: React.FC = () => {
     <div className="w-full">
       <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Dashboard</h1>
 
-      {/* Stats Grid - Responsivo com breakpoints otimizados */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 sm:gap-4 mb-6 sm:mb-8">
         {statCards.map((stat, index) => (
-          <div 
-            key={index} 
+          <div
+            key={index}
             className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 md:p-5 hover:shadow-md transition-all hover:-translate-y-0.5"
           >
             <div className="flex items-center justify-between">
@@ -208,13 +237,13 @@ const Dashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* Recent Orders - Responsivo */}
+      {/* Recent Orders */}
       <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 md:p-6">
         <h2 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
           <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
           Últimos Pedidos
         </h2>
-        
+
         {stats.recentOrders.length === 0 ? (
           <div className="text-center py-6 sm:py-8 text-gray-500">
             <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-gray-300 mb-2 sm:mb-3" />
@@ -265,10 +294,9 @@ const Dashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Link para ver todos os pedidos */}
         <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-100 text-center sm:text-right">
-          <Link 
-            to="/admin/orders" 
+          <Link
+            to="/admin/orders"
             className="inline-flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
           >
             Ver todos os pedidos
