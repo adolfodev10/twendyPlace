@@ -7,6 +7,7 @@ import {
     updateDoc,
     deleteDoc,
     query,
+    Query,
     where,
     orderBy,
     serverTimestamp,
@@ -20,130 +21,10 @@ import {
 import { db } from './firebase';
 import { Partner, PartnerProduct } from '../types';
 
-
-
 export const partnerService = {
     /**
      * 🔥 CRIAR PARCEIRO
      */
-
-    // Adicione estas funções ao partnerService.ts
-
-/**
- * 🔥 CRIAR PRODUTO DIRETAMENTE PARA UM PARCEIRO
- */
-async createPartnerProduct(
-    partnerId: string,
-    productData: {
-        name: string;
-        price: number;
-        category: string;
-        brand: string;
-        rating: number;
-        image: string;
-        description: string;
-        stock: number;
-        partnerPrice?: number;
-        commissionRate?: number;
-    }
-): Promise<{ success: boolean; productId?: string; error?: string }> {
-    try {
-        // 1. Criar o produto na coleção principal
-        const { productService } = await import('./productService');
-        
-        const newProduct = {
-            name: productData.name,
-            price: productData.partnerPrice || productData.price,
-            stock: productData.stock || 0,
-            category: productData.category,
-            brand: productData.brand,
-            rating: productData.rating || 5,
-            image: productData.image,
-            description: productData.description || '',
-            partnerId: partnerId,
-            isPartnerProduct: true,
-            partnerPrice: productData.partnerPrice || productData.price,
-            originalPrice: productData.price,
-            commissionRate: productData.commissionRate || 15,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        };
-
-        const result = await productService.addProduct(newProduct);
-        
-        if (!result.success || !result.id) {
-            return { success: false, error: result.error || 'Erro ao criar produto' };
-        }
-
-        // 2. Associar ao parceiro
-        await this.addProductToPartner(
-            partnerId,
-            result.id,
-            productData.partnerPrice || productData.price,
-            productData.commissionRate || 15
-        );
-
-        return { success: true, productId: result.id };
-    } catch (error: any) {
-        console.error('Erro ao criar produto do parceiro:', error);
-        return { success: false, error: error.message };
-    }
-},
-
-/**
- * 🔥 BUSCAR PRODUTOS DE PARCEIROS PARA A LOJA
- */
-async getPartnerProductsForStore(): Promise<any[]> {
-    try {
-        const q = query(
-            collection(db, 'products'),
-            where('isPartnerProduct', '==', true),
-            where('stock', '>', 0),
-            orderBy('name', 'asc')
-        );
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-            id: doc.id,
-            ...doc.data(),
-        }));
-    } catch (error) {
-        console.error('Erro ao buscar produtos de parceiros:', error);
-        return [];
-    }
-},
-
-/**
- * 🔥 CALCULAR COMISSÃO DE UMA VENDA DE PARCEIRO
- */
-async calculatePartnerCommission(
-    productId: string,
-    salePrice: number,
-    quantity: number
-): Promise<{ partnerId: string | null; commission: number; rate: number }> {
-    try {
-        const productDoc = await getDoc(doc(db, 'products', productId));
-        if (!productDoc.exists()) {
-            return { partnerId: null, commission: 0, rate: 0 };
-        }
-
-        const product = productDoc.data();
-        if (!product.isPartnerProduct || !product.partnerId) {
-            return { partnerId: null, commission: 0, rate: 0 };
-        }
-
-        const rate = product.commissionRate || 15;
-        const commission = (salePrice * rate) / 100;
-
-        return {
-            partnerId: product.partnerId,
-            commission: commission * quantity,
-            rate: rate,
-        };
-    } catch (error) {
-        console.error('Erro ao calcular comissão:', error);
-        return { partnerId: null, commission: 0, rate: 0 };
-    }
-},
     async createPartner(data: Omit<Partner, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ success: boolean; id?: string; error?: string }> {
         try {
             const partnerData = {
@@ -165,20 +46,57 @@ async calculatePartnerCommission(
     },
 
     /**
-     * 🔥 BUSCAR TODOS OS PARCEIROS
+     * 🔥 BUSCAR TODOS OS PARCEIROS (COM FALLBACK PARA ÍNDICE EM CONSTRUÇÃO)
      */
     async getAllPartners(status?: 'active' | 'inactive' | 'pending'): Promise<Partner[]> {
         try {
+            // Tentar com índice (quando estiver pronto)
             const collectionRef = collection(db, 'partners');
-            const constraints = status ? [where('status', '==', status), orderBy('name', 'asc')] : [orderBy('name', 'asc')];
-            const q = query(collectionRef, ...constraints);
+            const constraints: any[] = [];
 
+            if (status) {
+                constraints.push(where('status', '==', status));
+            }
+            constraints.push(orderBy('name', 'asc'));
+
+            const q = query(collectionRef, ...constraints);
             const snapshot = await getDocs(q);
+
             return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
                 id: doc.id,
                 ...doc.data() as Omit<Partner, 'id'>,
             }));
-        } catch (error) {
+        } catch (error: any) {
+            // 🔥 FALLBACK: Se o índice estiver em construção, buscar sem orderBy
+            if (error.message?.includes('index is currently building')) {
+                console.log('⏳ Índice em construção, usando fallback...');
+
+                try {
+                    const collectionRef = collection(db, 'partners');
+                    // Inicializar q como Query para permitir reatribuições com query(...)
+                    let q: Query<DocumentData> = query(collectionRef);
+
+                    if (status) {
+                        q = query(q, where('status', '==', status));
+                    }
+
+                    const snapshot = await getDocs(q);
+                    let partners = snapshot.docs.map((doc) => ({
+                        id: doc.id,
+                        ...doc.data() as Omit<Partner, 'id'>,
+                    }));
+
+                    // Ordenar no cliente
+                    partners.sort((a, b) => a.name.localeCompare(b.name));
+
+                    console.log(`✅ Fallback funcionou: ${partners.length} parceiros`);
+                    return partners;
+                } catch (fallbackError) {
+                    console.error('Erro no fallback:', fallbackError);
+                    return [];
+                }
+            }
+
             console.error('Erro ao buscar parceiros:', error);
             return [];
         }
@@ -268,6 +186,7 @@ async calculatePartnerCommission(
                 productImage: productData.image,
                 partnerPrice,
                 commission,
+                commissionRate,
                 status: 'active',
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
@@ -319,11 +238,20 @@ async calculatePartnerCommission(
 
             await updateDoc(doc(db, 'partners', partnerId), {
                 totalProducts: increment(-1),
-                products: arrayUnion(productId), // Vamos remover depois
                 updatedAt: serverTimestamp(),
             });
 
-            // TODO: Remover o productId do array products
+            // Remover productId do array products
+            const partnerDoc = await getDoc(doc(db, 'partners', partnerId));
+            if (partnerDoc.exists()) {
+                const data = partnerDoc.data();
+                const products = data.products || [];
+                const updatedProducts = products.filter((id: string) => id !== productId);
+                await updateDoc(doc(db, 'partners', partnerId), {
+                    products: updatedProducts,
+                });
+            }
+
             return { success: true };
         } catch (error: any) {
             console.error('Erro ao remover produto do parceiro:', error);
@@ -355,8 +283,10 @@ async calculatePartnerCommission(
                 salePrice,
                 commissionRate,
                 commissionValue,
+                totalCommission: commissionValue * quantity,
                 status: 'pending',
                 createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
             };
 
             const docRef = await addDoc(collection(db, 'partnerCommissions'), commissionData);
@@ -364,7 +294,7 @@ async calculatePartnerCommission(
             // Atualizar totais do parceiro
             await updateDoc(doc(db, 'partners', partnerId), {
                 totalSales: increment(salePrice * quantity),
-                totalCommission: increment(commissionValue),
+                totalCommission: increment(commissionValue * quantity),
                 updatedAt: serverTimestamp(),
             });
 
@@ -376,7 +306,121 @@ async calculatePartnerCommission(
     },
 
     /**
-     * 🔥 LISTENER EM TEMPO REAL - Parceiros
+     * 🔥 CRIAR PRODUTO DIRETAMENTE PARA UM PARCEIRO
+     */
+    async createPartnerProduct(
+        partnerId: string,
+        productData: {
+            name: string;
+            price: number;
+            category: string;
+            brand: string;
+            rating: number;
+            image: string;
+            description: string;
+            stock: number;
+            partnerPrice?: number;
+            commissionRate?: number;
+        }
+    ): Promise<{ success: boolean; productId?: string; error?: string }> {
+        try {
+            // 1. Criar o produto na coleção principal
+            const { productService } = await import('./productService');
+
+            const newProduct = {
+                name: productData.name,
+                price: productData.partnerPrice || productData.price,
+                stock: productData.stock || 0,
+                category: productData.category,
+                brand: productData.brand,
+                rating: productData.rating || 5,
+                image: productData.image,
+                description: productData.description || '',
+                partnerId: partnerId,
+                isPartnerProduct: true,
+                partnerPrice: productData.partnerPrice || productData.price,
+                originalPrice: productData.price,
+                commissionRate: productData.commissionRate || 15,
+            };
+
+            const result = await productService.addProduct(newProduct);
+
+            if (!result.success || !result.id) {
+                return { success: false, error: result.error || 'Erro ao criar produto' };
+            }
+
+            // 2. Associar ao parceiro
+            await this.addProductToPartner(
+                partnerId,
+                result.id,
+                productData.partnerPrice || productData.price,
+                productData.commissionRate || 15
+            );
+
+            return { success: true, productId: result.id };
+        } catch (error: any) {
+            console.error('Erro ao criar produto do parceiro:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    /**
+     * 🔥 BUSCAR PRODUTOS DE PARCEIROS PARA A LOJA
+     */
+    async getPartnerProductsForStore(): Promise<any[]> {
+        try {
+            const q = query(
+                collection(db, 'products'),
+                where('isPartnerProduct', '==', true),
+                where('stock', '>', 0),
+                orderBy('name', 'asc')
+            );
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+                id: doc.id,
+                ...doc.data(),
+            }));
+        } catch (error) {
+            console.error('Erro ao buscar produtos de parceiros:', error);
+            return [];
+        }
+    },
+
+    /**
+     * 🔥 CALCULAR COMISSÃO DE UMA VENDA DE PARCEIRO
+     */
+    async calculatePartnerCommission(
+        productId: string,
+        salePrice: number,
+        quantity: number
+    ): Promise<{ partnerId: string | null; commission: number; rate: number }> {
+        try {
+            const productDoc = await getDoc(doc(db, 'products', productId));
+            if (!productDoc.exists()) {
+                return { partnerId: null, commission: 0, rate: 0 };
+            }
+
+            const product = productDoc.data();
+            if (!product.isPartnerProduct || !product.partnerId) {
+                return { partnerId: null, commission: 0, rate: 0 };
+            }
+
+            const rate = product.commissionRate || 15;
+            const commission = (salePrice * rate) / 100;
+
+            return {
+                partnerId: product.partnerId,
+                commission: commission * quantity,
+                rate: rate,
+            };
+        } catch (error) {
+            console.error('Erro ao calcular comissão:', error);
+            return { partnerId: null, commission: 0, rate: 0 };
+        }
+    },
+
+    /**
+     * 🔥 LISTENER EM TEMPO REAL - Parceiros (COM FALLBACK)
      */
     onPartners(
         callback: (partners: Partner[]) => void,
@@ -384,7 +428,7 @@ async calculatePartnerCommission(
         onError?: (error: Error) => void
     ): Unsubscribe {
         try {
-            const constraints = [];
+            const constraints: any[] = [];
             if (status) {
                 constraints.push(where('status', '==', status));
             }
@@ -400,6 +444,36 @@ async calculatePartnerCommission(
                     callback(partners);
                 },
                 (error) => {
+                    // 🔥 Se o índice estiver em construção, tentar sem orderBy
+                    if (error.message?.includes('index is currently building')) {
+                        console.log('⏳ Índice em construção no listener, usando fallback...');
+
+                        try {
+                            const q2 = status
+                                ? query(collection(db, 'partners'), where('status', '==', status))
+                                : collection(db, 'partners');
+
+                            return onSnapshot(q2,
+                                (snapshot) => {
+                                    let partners = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+                                        id: doc.id,
+                                        ...doc.data() as Omit<Partner, 'id'>,
+                                    }));
+                                    partners.sort((a, b) => a.name.localeCompare(b.name));
+                                    callback(partners);
+                                },
+                                (err) => {
+                                    console.error('Erro no fallback do listener:', err);
+                                    if (onError) onError(err);
+                                }
+                            );
+                        } catch (fallbackError) {
+                            console.error('Erro ao criar fallback do listener:', fallbackError);
+                            if (onError) onError(fallbackError as Error);
+                            return () => { };
+                        }
+                    }
+
                     console.error('Erro no listener de parceiros:', error);
                     if (onError) onError(error);
                 }
@@ -407,7 +481,87 @@ async calculatePartnerCommission(
         } catch (error) {
             console.error('Erro ao criar listener:', error);
             if (onError) onError(error as Error);
-            return () => {};
+            return () => { };
+        }
+    },
+
+    /**
+     * 🔥 BUSCAR COMISSÕES DE UM PARCEIRO
+     */
+    async getPartnerCommissions(partnerId: string): Promise<any[]> {
+        try {
+            const q = query(
+                collection(db, 'partnerCommissions'),
+                where('partnerId', '==', partnerId),
+                orderBy('createdAt', 'desc')
+            );
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+                id: doc.id,
+                ...doc.data(),
+            }));
+        } catch (error) {
+            console.error('Erro ao buscar comissões do parceiro:', error);
+            return [];
+        }
+    },
+
+    /**
+     * 🔥 PAGAR COMISSÃO DE PARCEIRO
+     */
+    async payPartnerCommission(
+        commissionId: string
+    ): Promise<{ success: boolean; error?: string }> {
+        try {
+            const commissionRef = doc(db, 'partnerCommissions', commissionId);
+            await updateDoc(commissionRef, {
+                status: 'paid',
+                paidAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
+
+            return { success: true };
+        } catch (error: any) {
+            console.error('Erro ao pagar comissão:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    /**
+     * 🔥 ESTATÍSTICAS DOS PARCEIROS
+     */
+    async getPartnerStats(): Promise<{
+        total: number;
+        active: number;
+        pending: number;
+        inactive: number;
+        totalSales: number;
+        totalCommission: number;
+    }> {
+        try {
+            const snapshot = await getDocs(collection(db, 'partners'));
+            const partners = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+                ...doc.data() as Partner,
+            }));
+
+            return {
+                total: partners.length,
+                active: partners.filter(p => p.status === 'active').length,
+                pending: partners.filter(p => p.status === 'pending').length,
+                inactive: partners.filter(p => p.status === 'inactive').length,
+                totalSales: partners.reduce((sum, p) => sum + (p.totalSales || 0), 0),
+                totalCommission: partners.reduce((sum, p) => sum + (p.totalCommission || 0), 0),
+            };
+        } catch (error) {
+            console.error('Erro ao buscar estatísticas:', error);
+            return {
+                total: 0,
+                active: 0,
+                pending: 0,
+                inactive: 0,
+                totalSales: 0,
+                totalCommission: 0,
+            };
         }
     }
 };
