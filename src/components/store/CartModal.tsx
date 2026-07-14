@@ -5,7 +5,6 @@ import { X, ShoppingCart, Trash2, Minus, Plus, CreditCard, Upload, File, Check, 
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { cartService } from '../../services/cartService';
-import axios from "axios";
 
 interface CartModalProps {
   isOpen: boolean;
@@ -246,49 +245,54 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     setShowConfirmModal(true);
   };
 
-  // 🔥 HANDLE UPLOAD DE COMPROVATIVO
-  const handleFileUpload = async (file: File) => {
-    // Validar tamanho (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Arquivo muito grande. Máximo 5MB.');
-      return;
-    }
+  // 🔥 HANDLE UPLOAD DE COMPROVATIVO - CORRIGIDO
+const handleFileUpload = async (file: File) => {
+  // Validar tamanho (5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    toast.error('Arquivo muito grande. Máximo 5MB.');
+    return;
+  }
 
-    // Validar tipo
-    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-    if (!validTypes.includes(file.type)) {
-      toast.error('Formato inválido. Use PNG, JPG ou PDF.');
-      return;
-    }
+  // Validar tipo
+  const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+  if (!validTypes.includes(file.type)) {
+    toast.error('Formato inválido. Use PNG, JPG ou PDF.');
+    return;
+  }
 
-    setUploadedFile(file);
-    setIsUploading(true);
-    setUploadProgress(0);
+  setUploadedFile(file);
+  setIsUploading(true);
+  setUploadProgress(0);
 
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
+  try {
+    // 🔥 CORRIGIDO: Usar FormData corretamente
+    const formData = new FormData();
+    formData.append('image', file);
 
+    // 🔥 CORRIGIDO: Usar fetch (mais simples e confiável)
+    const response = await fetch('https://api.imgbb.com/1/upload?key=4e470b576522a10c52b87edf23905cb3', {
+      method: 'POST',
+      body: formData,
+    });
 
-      const response = await axios.post(`https://api.imgbb.com/1/upload?key=${user?.uid}`, {
-        formData
-      });
+    const data = await response.json();
 
-      const data = await response.data.json();
-
-       if (data.success) {
+    if (data.success) {
       setUploadedFileURL(data.data.url);
       setUploadProgress(100);
       toast.success('Comprovativo enviado com sucesso!');
     } else {
       toast.error('Erro ao enviar comprovativo. Tente novamente.');
+      setUploadedFile(null);
     }
-    } catch (error) {
-      console.error('Erro no upload:', error);
-      toast.error('Erro ao enviar comprovativo. Tente novamente.');
-      setIsUploading(false);
-    }
-  };
+  } catch (error) {
+    console.error('Erro no upload:', error);
+    toast.error('Erro ao enviar comprovativo. Tente novamente.');
+    setUploadedFile(null);
+  } finally {
+    setIsUploading(false);
+  }
+};
 
   // 🔥 HANDLE CONFIRMAR PEDIDO
   const handleConfirmOrder = async () => {
