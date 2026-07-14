@@ -23,13 +23,15 @@ import {
     Download,
     X,
     Shield,
-    Check
+    Check,
+    Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
     doc,
     getDoc,
     updateDoc,
+    deleteDoc, // 🔥 ADICIONADO
     serverTimestamp,
     setDoc,
     collection,
@@ -110,7 +112,7 @@ const ProofViewerModal: React.FC<{
     );
 };
 
-// Modal de Confirmação
+// Modal de Confirmação para Status
 const ConfirmModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -175,6 +177,61 @@ const ConfirmModal: React.FC<{
     );
 };
 
+// 🔥 NOVO: Modal de Confirmação de Exclusão
+const DeleteConfirmModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    orderNumber: string;
+    loading: boolean;
+}> = ({ isOpen, onClose, onConfirm, orderNumber, loading }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl max-w-md w-full shadow-2xl animate-[modalSlideUp_0.3s_ease]">
+                <div className="p-6 text-center">
+                    <div className="w-16 h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4">
+                        <AlertTriangle className="w-8 h-8 text-red-500" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Eliminar Pedido</h3>
+                    <p className="text-gray-600">
+                        Tem certeza que deseja eliminar o pedido <strong>#{orderNumber}</strong>?
+                    </p>
+                    <p className="text-sm text-red-500 mt-1">Esta ação não pode ser desfeita.</p>
+                    <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                        <button
+                            onClick={onClose}
+                            disabled={loading}
+                            className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={onConfirm}
+                            disabled={loading}
+                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Eliminando...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 className="w-4 h-4" />
+                                    Eliminar
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const OrdersManager: React.FC = () => {
     const { user } = useAuth();
     const [orders, setOrders] = useState<Order[]>([]);
@@ -184,6 +241,7 @@ const OrdersManager: React.FC = () => {
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [updating, setUpdating] = useState<string | null>(null);
     const [viewingProof, setViewingProof] = useState<{ orderId: string; url: string } | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
@@ -199,6 +257,17 @@ const OrdersManager: React.FC = () => {
         oldStatus: '',
         orderNumber: '',
         hasProof: false,
+    });
+
+    // 🔥 NOVO: Estado para o modal de exclusão
+    const [deleteModal, setDeleteModal] = useState<{
+        isOpen: boolean;
+        orderId: string;
+        orderNumber: string;
+    }>({
+        isOpen: false,
+        orderId: '',
+        orderNumber: '',
     });
 
     useEffect(() => {
@@ -246,11 +315,9 @@ const OrdersManager: React.FC = () => {
             return;
         }
 
-        // 🔥 VERIFICAR SE TEM COMPROVATIVO
         const order = orders.find(o => o.id === orderId);
         const hasProof = !!order?.paymentProof;
 
-        // 🔥 BLOQUEAR SE NÃO TIVER COMPROVATIVO E ESTIVER TENTANDO MUDAR PARA "paid"
         if (newStatus === 'paid' && !hasProof) {
             toast.error('Cliente não enviou comprovativo de pagamento', {
                 icon: <AlertCircle className="w-5 h-5 text-red-500" />,
@@ -266,6 +333,15 @@ const OrdersManager: React.FC = () => {
             oldStatus,
             orderNumber,
             hasProof,
+        });
+    };
+
+    // 🔥 NOVO: Abrir modal de exclusão
+    const openDeleteModal = (orderId: string, orderNumber: string) => {
+        setDeleteModal({
+            isOpen: true,
+            orderId,
+            orderNumber,
         });
     };
 
@@ -287,7 +363,6 @@ const OrdersManager: React.FC = () => {
             const orderData = orderSnap.data() as Record<string, any>;
             const now = new Date().toISOString();
 
-            // 🔥 Registrar validação
             const historyEntry = {
                 from: oldStatus,
                 to: newStatus,
@@ -299,7 +374,6 @@ const OrdersManager: React.FC = () => {
                 validatedByName: newStatus === 'paid' ? user?.name : null,
             };
 
-            // 🔥 Atualizar com validação
             await updateDoc(orderRef, {
                 status: newStatus,
                 updatedAt: serverTimestamp(),
@@ -313,15 +387,12 @@ const OrdersManager: React.FC = () => {
                 })
             });
 
-
-            // Se cancelado, devolver estoque
             if (newStatus === 'cancelled' && orderData.items) {
-                if(oldStatus !== 'paid'){
+                if (oldStatus !== 'paid') {
                     await restoreStock(orderData.items);
                 }
             }
 
-            // Notificar cliente
             if (orderData?.userId) {
                 await saveNotificationForClient(orderData.userId, {
                     orderId: orderId,
@@ -361,6 +432,47 @@ const OrdersManager: React.FC = () => {
         } finally {
             setUpdating(null);
             setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '', hasProof: false });
+        }
+    };
+
+    // 🔥 NOVO: Executar exclusão do pedido
+    const executeDeleteOrder = async () => {
+        const { orderId, orderNumber } = deleteModal;
+        setDeleting(true);
+
+        try {
+            const orderRef = doc(db, 'orders', orderId);
+            const orderSnap = await getDoc(orderRef);
+
+            if (!orderSnap.exists()) {
+                toast.error('Pedido não encontrado');
+                setDeleting(false);
+                setDeleteModal({ isOpen: false, orderId: '', orderNumber: '' });
+                return;
+            }
+
+            const orderData = orderSnap.data();
+
+            // 🔥 Restaurar estoque se o pedido não foi cancelado
+            if (orderData.status !== 'cancelled' && orderData.items) {
+                await restoreStock(orderData.items);
+            }
+
+            // 🔥 ELIMINAR O PEDIDO
+            await deleteDoc(orderRef);
+
+            toast.success(`Pedido #${orderNumber} eliminado com sucesso!`);
+            setDeleteModal({ isOpen: false, orderId: '', orderNumber: '' });
+
+            // 🔥 Recarregar a lista de pedidos
+            setLoading(true);
+            setTimeout(() => setLoading(false), 500);
+
+        } catch (error: any) {
+            console.error('Erro ao eliminar pedido:', error);
+            toast.error('Erro ao eliminar pedido. Tente novamente.');
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -482,7 +594,7 @@ const OrdersManager: React.FC = () => {
 
     return (
         <div>
-            {/* Modal de Confirmação */}
+            {/* Modal de Confirmação para Status */}
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
                 onClose={() => setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '', hasProof: false })}
@@ -493,6 +605,15 @@ const OrdersManager: React.FC = () => {
                 confirmText="Confirmar"
                 cancelText="Cancelar"
                 warning={confirmModal.newStatus === 'paid' ? 'Ao confirmar, o pagamento será validado e o cliente será notificado.' : undefined}
+            />
+
+            {/* 🔥 NOVO: Modal de Confirmação de Exclusão */}
+            <DeleteConfirmModal
+                isOpen={deleteModal.isOpen}
+                onClose={() => setDeleteModal({ isOpen: false, orderId: '', orderNumber: '' })}
+                onConfirm={executeDeleteOrder}
+                orderNumber={deleteModal.orderNumber}
+                loading={deleting}
             />
 
             {/* Modal de Visualização de Comprovativo */}
@@ -564,7 +685,7 @@ const OrdersManager: React.FC = () => {
             {/* Orders Table */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[900px]">
+                    <table className="w-full min-w-[950px]">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">
@@ -606,6 +727,7 @@ const OrdersManager: React.FC = () => {
                                     const isUpdating = updating === order.id;
                                     const hasProof = !!order.paymentProof;
                                     const isPaidOrProcessing = order.status === 'paid' || order.status === 'processing';
+                                    const isDeletable = order.status === 'cancelled' || order.status === 'delivered';
 
                                     return (
                                         <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
@@ -653,7 +775,7 @@ const OrdersManager: React.FC = () => {
                                                 )}
                                             </td>
                                             <td className="py-3 px-3 sm:px-4">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1 flex-wrap">
                                                     <select
                                                         value={order.status}
                                                         onChange={(e) => openConfirmModal(
@@ -663,7 +785,7 @@ const OrdersManager: React.FC = () => {
                                                             order.orderNumber || order.id.slice(-8)
                                                         )}
                                                         disabled={isUpdating || (order.status === 'delivered' || order.status === 'cancelled')}
-                                                        className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:opacity-50"
+                                                        className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:opacity-50 max-w-[110px]"
                                                     >
                                                         {statusOptions.filter(opt => opt.value !== 'all').map(opt => (
                                                             <option key={opt.value} value={opt.value}>
@@ -673,6 +795,20 @@ const OrdersManager: React.FC = () => {
                                                     </select>
                                                     {isUpdating && (
                                                         <Loader2 className="animate-spin w-4 h-4 text-primary-600" />
+                                                    )}
+                                                    {/* 🔥 BOTÃO DE ELIMINAR */}
+                                                    {isDeletable && (
+                                                        <button
+                                                            onClick={() => openDeleteModal(order.id, order.orderNumber || order.id.slice(-8))}
+                                                            className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Eliminar pedido"
+                                                            disabled={isUpdating}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {!isDeletable && (
+                                                        <span className="text-[10px] text-gray-400">Ativo</span>
                                                     )}
                                                     {!hasProof && order.status === 'awaiting_payment' && (
                                                         <span className="text-xs text-yellow-600 flex items-center gap-1">
