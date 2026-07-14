@@ -26,13 +26,13 @@ import {
     Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { 
-    doc, 
-    getDoc, 
-    updateDoc, 
-    serverTimestamp, 
-    setDoc, 
-    collection, 
+import {
+    doc,
+    getDoc,
+    updateDoc,
+    serverTimestamp,
+    setDoc,
+    collection,
     arrayUnion,
     increment,
     writeBatch
@@ -98,8 +98,8 @@ const ProofViewerModal: React.FC<{
                         <Download className="w-4 h-4" />
                         Baixar
                     </a>
-                    <button 
-                        onClick={onClose} 
+                    <button
+                        onClick={onClose}
                         className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                     >
                         Fechar
@@ -184,7 +184,7 @@ const OrdersManager: React.FC = () => {
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [updating, setUpdating] = useState<string | null>(null);
     const [viewingProof, setViewingProof] = useState<{ orderId: string; url: string } | null>(null);
-    
+
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
         orderId: string;
@@ -332,7 +332,7 @@ const OrdersManager: React.FC = () => {
             }
 
             toast.success(`Status atualizado para: ${STATUS_HISTORY[newStatus]?.label || newStatus}`);
-            
+
             if (newStatus === 'paid') {
                 toast.success(`✅ Pagamento validado por ${user?.name || 'Administrador'}`, {
                     icon: <Check className="w-5 h-5 text-green-500" />,
@@ -347,7 +347,7 @@ const OrdersManager: React.FC = () => {
 
         } catch (error: any) {
             console.error('Erro ao atualizar status:', error);
-            
+
             if (error.code === 'permission-denied') {
                 toast.error('Sem permissão para alterar status');
             } else if (error.code === 'not-found') {
@@ -583,7 +583,7 @@ const OrdersManager: React.FC = () => {
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">
                                     Status
                                 </th>
-                                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 hidden lg:table-cell">
+                                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">
                                     <FileImage className="w-3.5 h-3.5 inline mr-1" />
                                     Comprovativo
                                 </th>
@@ -633,7 +633,7 @@ const OrdersManager: React.FC = () => {
                                                     <span>{STATUS_HISTORY[order.status]?.label || order.status}</span>
                                                 </span>
                                             </td>
-                                            <td className="py-3 px-3 sm:px-4 hidden lg:table-cell">
+                                            <td className="py-3 px-3 sm:px-4">
                                                 {hasProof ? (
                                                     <button
                                                         onClick={() => setViewingProof({ orderId: order.id, url: order.paymentProof! })}
@@ -641,10 +641,10 @@ const OrdersManager: React.FC = () => {
                                                         title="Ver comprovativo"
                                                     >
                                                         <Eye className="w-3.5 h-3.5" />
-                                                        Ver
+                                                        <span className="hidden sm:inline">Ver</span>
                                                     </button>
                                                 ) : (
-                                                    <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">
+                                                    <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg whitespace-nowrap">
                                                         Não enviado
                                                     </span>
                                                 )}
