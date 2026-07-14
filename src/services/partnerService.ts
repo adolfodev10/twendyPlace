@@ -404,9 +404,6 @@ export const partnerService = {
             // 🔥 Ordenar por nome
             products.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-            console.log(`✅ Produtos de parceiros: ${products.length} encontrados`);
-            console.log('🔍 Primeiro produto:', products[0]);
-
             return products;
         } catch (error) {
             console.error('Erro ao buscar produtos de parceiros:', error);
