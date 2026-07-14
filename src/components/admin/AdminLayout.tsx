@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
   Users,
   LogOut,
   Menu,
@@ -46,7 +46,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { path: '/admin/orders', icon: ShoppingCart, label: 'Pedidos' },
     { path: '/admin/products', icon: Package, label: 'Produtos' },
     { path: '/admin/clients', icon: Users, label: 'Clientes' },
-    { path: '/admin/proofPayment', icon: FileImage, label: 'Comprovativos'}
+    { path: '/admin/proofPayment', icon: FileImage, label: 'Comprovativos' }
   ];
 
   const handleLogout = async () => {
@@ -85,7 +85,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
       {/* Overlay para mobile */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="lg:hidden fixed inset-0 bg-black/50 z-40 animate-fadeIn"
           onClick={closeSidebar}
         />
