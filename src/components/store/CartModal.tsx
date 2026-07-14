@@ -280,6 +280,11 @@ const handleFileUpload = async (file: File) => {
       );
 
       if (result.success) {
+        if (!result.orderId) {
+          toast.error('ID do pedido inválido. Tente novamente.');
+          return;
+        }
+        await cartService.updateOrderStatus(result.orderId, 'paid');
         clearCart();
         setShowConfirmModal(false);
         onClose();
