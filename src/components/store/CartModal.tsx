@@ -6,7 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { cartService } from '../../services/cartService';
 import { storage } from '../../services/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 interface CartModalProps {
   isOpen: boolean;
@@ -56,7 +56,6 @@ const ConfirmModal: React.FC<{
             Confirme seu pedido de <strong className="text-primary-600">Kz {total.toFixed(2)}</strong>
           </p>
 
-          {/* Resumo do Pedido */}
           <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left max-h-40 overflow-y-auto">
             {items.map((item, index) => (
               <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
@@ -72,7 +71,7 @@ const ConfirmModal: React.FC<{
             </div>
           </div>
 
-          {/* 🔥 Upload de Comprovativo */}
+          {/* Upload de Comprovativo */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2 text-left">
               Comprovativo de Pagamento *
@@ -205,7 +204,6 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
       toast.error('Seu carrinho está vazio');
       return;
     }
-    // Resetar estado do upload
     setUploadedFile(null);
     setUploadProgress(0);
     setIsUploading(false);
@@ -213,14 +211,13 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     setShowConfirmModal(true);
   };
 
+  // 🔥 Upload corrigido com uploadBytesResumable e tratamento de erros
   const handleFileUpload = async (file: File) => {
-    // Validar tamanho (5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Arquivo muito grande. Máximo 5MB.');
       return;
     }
 
-    // Validar tipo
     const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
     if (!validTypes.includes(file.type)) {
       toast.error('Formato inválido. Use PNG, JPG ou PDF.');
@@ -232,21 +229,51 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     setUploadProgress(0);
 
     try {
+      // 🔥 Caminho correto para o Firebase Storage
       const storageRef = ref(storage, `comprovantes/${user?.uid}/${Date.now()}_${file.name}`);
       
-      // Upload com progresso
-      const uploadTask = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(uploadTask.ref);
-      
-      setUploadedFileURL(url);
-      setUploadProgress(100);
-      toast.success('Comprovativo enviado com sucesso!');
+      // 🔥 Usar uploadBytesResumable para melhor controle
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      // 🔥 Acompanhar progresso
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        },
+        (error) => {
+          console.error('Erro no upload:', error);
+          
+          // 🔥 Tratamento de erros específicos
+          if (error.code === 'storage/unauthorized') {
+            toast.error('Sem permissão para enviar arquivo');
+          } else if (error.code === 'storage/canceled') {
+            toast.error('Upload cancelado');
+          } else {
+            toast.error('Erro ao enviar comprovativo. Tente novamente.');
+          }
+          setIsUploading(false);
+          setUploadedFile(null);
+        },
+        async () => {
+          // 🔥 Upload concluído com sucesso
+          try {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            setUploadedFileURL(url);
+            setUploadProgress(100);
+            toast.success('Comprovativo enviado com sucesso!');
+            setIsUploading(false);
+          } catch (error) {
+            console.error('Erro ao obter URL:', error);
+            toast.error('Erro ao processar comprovativo');
+            setIsUploading(false);
+          }
+        }
+      );
     } catch (error) {
       console.error('Erro no upload:', error);
       toast.error('Erro ao enviar comprovativo. Tente novamente.');
-      setUploadedFile(null);
-      setUploadedFileURL(null);
-    } finally {
       setIsUploading(false);
     }
   };
@@ -267,16 +294,13 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
         city: user?.city || '',
       };
 
-      // Ajuste: enviar os dados adicionais em um único objeto para evitar passar 6 argumentos
       const result = await cartService.createOrder(
         user!.uid,
         items,
         totalPrice,
-        {
-          customerData,
-          paymentMethod: 'multicaixa',
-          proofUrl: uploadedFileURL, // 🔥 Envia URL do comprovativo
-        }
+        customerData,
+        'multicaixa',
+        uploadedFileURL
       );
 
       if (result.success) {
@@ -303,7 +327,7 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
         
         <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl">
           <div className="flex h-full flex-col">
-            {/* Header - igual ao original */}
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5 text-primary-600" />
@@ -317,7 +341,7 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
               </button>
             </div>
 
-            {/* Items - igual ao original */}
+            {/* Items */}
             <div className="flex-1 overflow-y-auto px-4 py-4">
               {items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
@@ -358,7 +382,7 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
               )}
             </div>
 
-            {/* Footer - igual ao original */}
+            {/* Footer */}
             {items.length > 0 && (
               <div className="border-t border-gray-200 px-4 py-4">
                 <div className="flex justify-between mb-2">
@@ -395,7 +419,6 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
         </div>
       </div>
 
-      {/* Modal de Confirmação com Upload */}
       <ConfirmModal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
