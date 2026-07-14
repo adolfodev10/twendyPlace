@@ -35,7 +35,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Se tiver usuário
       if (user) {
         try {
-          const cartDoc = await getDoc(doc(db, 'carts', user.uid));
+          const cartDoc = await getDoc(doc(db, 'users', user.uid));
           if (cartDoc.exists()) {
             const data = cartDoc.data();
             if (data.items && Array.isArray(data.items)) {
@@ -66,7 +66,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const saveCart = async () => {
       if (user) {
         try {
-          await setDoc(doc(db, 'carts', user.uid), {
+          await setDoc(doc(db, 'users', user.uid), {
             items,
             updatedAt: serverTimestamp(),
           }, { merge: true });

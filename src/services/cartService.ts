@@ -282,8 +282,8 @@ export const cartService = {
     },
 
     /**
-     * Atualizar status do pedido (com validação de comprovativo e comissões)
-     */
+ * Atualizar status do pedido (com validação de comprovativo e comissões)
+ */
     async updateOrderStatus(
         orderId: string,
         newStatus: string,
@@ -300,7 +300,7 @@ export const cartService = {
 
             const orderData = orderSnap.data();
 
-            // 🔥 VALIDAÇÃO: Se for mudar para "paid", verificar comprovativo
+            // 🔥 VALIDAÇÃO: Se for mudar para "paid", verificar comprovativo PRIMEIRO
             if (newStatus === 'paid' && !orderData.paymentProof) {
                 return { success: false, error: 'Cliente não enviou comprovativo de pagamento' };
             }
@@ -316,12 +316,12 @@ export const cartService = {
                 newStatus: newStatus,
             };
 
-            // 🔥 Se o pedido for pago e tiver comissões, marcar como pendente de pagamento
+            // 🔥 Preparar os dados para atualização
             const updateData: any = {
                 status: newStatus,
                 updatedAt: serverTimestamp(),
-                validatedBy: validatedBy || null,
-                validatedByName: validatedByName || null,
+                validatedBy: newStatus === 'paid' ? (validatedBy || null) : null,
+                validatedByName: newStatus === 'paid' ? (validatedByName || null) : null,
                 validatedAt: newStatus === 'paid' ? now : null,
                 validationHistory: arrayUnion(validationEntry),
             };
@@ -351,7 +351,6 @@ export const cartService = {
             return { success: false, error: error.message };
         }
     },
-
     /**
      * Buscar pedido por ID
      */
