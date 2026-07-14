@@ -5,8 +5,6 @@ import { X, ShoppingCart, Trash2, Minus, Plus, CreditCard, Upload, File, Check, 
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { cartService } from '../../services/cartService';
-import { storage } from '../../services/firebase';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 interface CartModalProps {
   isOpen: boolean;
@@ -211,72 +209,50 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     setShowConfirmModal(true);
   };
 
-  // 🔥 Upload corrigido com uploadBytesResumable e tratamento de erros
-  const handleFileUpload = async (file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Arquivo muito grande. Máximo 5MB.');
-      return;
-    }
+// Substitua a função handleFileUpload por esta:
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-    if (!validTypes.includes(file.type)) {
-      toast.error('Formato inválido. Use PNG, JPG ou PDF.');
-      return;
-    }
+const handleFileUpload = async (file: File) => {
+  if (file.size > 5 * 1024 * 1024) {
+    toast.error('Arquivo muito grande. Máximo 5MB.');
+    return;
+  }
 
-    setUploadedFile(file);
-    setIsUploading(true);
-    setUploadProgress(0);
+  const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+  if (!validTypes.includes(file.type)) {
+    toast.error('Formato inválido. Use PNG, JPG ou PDF.');
+    return;
+  }
 
-    try {
-      // 🔥 Caminho correto para o Firebase Storage
-      const storageRef = ref(storage, `comprovantes/${user?.uid}/${Date.now()}_${file.name}`);
-      
-      // 🔥 Usar uploadBytesResumable para melhor controle
-      const uploadTask = uploadBytesResumable(storageRef, file);
+  setUploadedFile(file);
+  setIsUploading(true);
+  setUploadProgress(0);
 
-      // 🔥 Acompanhar progresso
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-        },
-        (error) => {
-          console.error('Erro no upload:', error);
-          
-          // 🔥 Tratamento de erros específicos
-          if (error.code === 'storage/unauthorized') {
-            toast.error('Sem permissão para enviar arquivo');
-          } else if (error.code === 'storage/canceled') {
-            toast.error('Upload cancelado');
-          } else {
-            toast.error('Erro ao enviar comprovativo. Tente novamente.');
-          }
-          setIsUploading(false);
-          setUploadedFile(null);
-        },
-        async () => {
-          // 🔥 Upload concluído com sucesso
-          try {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            setUploadedFileURL(url);
-            setUploadProgress(100);
-            toast.success('Comprovativo enviado com sucesso!');
-            setIsUploading(false);
-          } catch (error) {
-            console.error('Erro ao obter URL:', error);
-            toast.error('Erro ao processar comprovativo');
-            setIsUploading(false);
-          }
-        }
-      );
-    } catch (error) {
-      console.error('Erro no upload:', error);
+  try {
+    // 🔥 USAR IMGBB - NÃO PRECISA DE CORS!
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    const response = await fetch('https://api.imgbb.com/1/upload?key=4e470b576522a10c52b87edf23905cb3', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      setUploadedFileURL(data.data.url);
+      setUploadProgress(100);
+      toast.success('Comprovativo enviado com sucesso!');
+    } else {
       toast.error('Erro ao enviar comprovativo. Tente novamente.');
-      setIsUploading(false);
     }
-  };
+  } catch (error) {
+    console.error('Erro no upload:', error);
+    toast.error('Erro ao enviar comprovativo. Tente novamente.');
+  } finally {
+    setIsUploading(false);
+  }
+};
 
   const handleConfirmOrder = async () => {
     if (!uploadedFileURL) {
