@@ -1,5 +1,5 @@
-import { 
-  createUserWithEmailAndPassword, 
+import {
+  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -19,6 +19,26 @@ interface RegisterData {
 }
 
 export const authService = {
+
+  // 🔥 Buscar usuário atual
+  getCurrentUser(): any {
+    return auth.currentUser;
+  },
+
+  // 🔥 Buscar papel do usuário
+  async getUserRole(uid: string): Promise<string> {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        return data.role || 'customer';
+      }
+      return 'customer';
+    } catch (error) {
+      console.error('Erro ao buscar papel do usuário:', error);
+      return 'customer';
+    }
+  },
   /**
    * Registrar um novo usuário
    */
@@ -29,7 +49,7 @@ export const authService = {
         data.email,
         data.password
       );
-      
+
       const { user } = userCredential;
 
       // Atualizar perfil com nome
@@ -54,7 +74,7 @@ export const authService = {
       return { success: true, user };
     } catch (error: any) {
       console.error('Erro no registro:', error);
-      
+
       let message = 'Erro ao criar conta.';
       if (error.code === 'auth/email-already-in-use') {
         message = 'Este email já está em uso.';
@@ -63,7 +83,7 @@ export const authService = {
       } else if (error.code === 'auth/invalid-email') {
         message = 'O email fornecido é inválido.';
       }
-      
+
       return { success: false, error: message };
     }
   },
@@ -74,13 +94,13 @@ export const authService = {
   async login(email: string, password: string): Promise<{ success: boolean; error?: string; user?: any }> {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
+
       // Buscar dados adicionais do usuário
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       const userData = userDoc.exists() ? userDoc.data() : {};
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         user: {
           ...userCredential.user,
           ...userData
@@ -88,7 +108,7 @@ export const authService = {
       };
     } catch (error: any) {
       console.error('Erro no login:', error);
-      
+
       let message = 'Erro ao fazer login.';
       if (error.code === 'auth/user-not-found') {
         message = 'Usuário não encontrado.';
@@ -99,7 +119,7 @@ export const authService = {
       } else if (error.code === 'auth/user-disabled') {
         message = 'Esta conta foi desativada.';
       }
-      
+
       return { success: false, error: message };
     }
   },
@@ -126,14 +146,14 @@ export const authService = {
       return { success: true };
     } catch (error: any) {
       console.error('Erro no reset de senha:', error);
-      
+
       let message = 'Erro ao enviar email de recuperação.';
       if (error.code === 'auth/user-not-found') {
         message = 'Usuário não encontrado.';
       } else if (error.code === 'auth/invalid-email') {
         message = 'Email inválido.';
       }
-      
+
       return { success: false, error: message };
     }
   },

@@ -41,6 +41,7 @@ const Login: React.FC = () => {
     return re.test(email);
   };
 
+  // 🔥 Redirecionar quando o usuário estiver logado (funciona para login já existente)
   useEffect(() => {
     if (user) {
       if (user.role === 'admin') {
@@ -81,9 +82,9 @@ const Login: React.FC = () => {
     }
 
     return () => clearInterval(interval);
-  }, [isLocked]); // ✅ OK
+  }, [isLocked]);
 
-  // 🔥 Verificar bloqueio ao carregar a página (executa apenas uma vez)
+  // 🔥 Verificar bloqueio ao carregar a página
   useEffect(() => {
     const lockoutUntil = localStorage.getItem(LOCKOUT_KEY);
     if (lockoutUntil) {
@@ -99,7 +100,7 @@ const Login: React.FC = () => {
         setLoginAttempts(0);
       }
     }
-  }, []); // ✅ Array vazio = executa apenas uma vez
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,6 +144,26 @@ const Login: React.FC = () => {
         setIsLocked(false);
         setRemainingTime(0);
         toast.success('Login realizado com sucesso!');
+
+        // 🔥 REDIRECIONAMENTO MANUAL (garantido)
+        // Aguarda um pouco para o AuthContext atualizar
+        setTimeout(() => {
+          // Buscar o usuário atualizado
+          const currentUser = authService.getCurrentUser();
+          if (currentUser) {
+            // Verificar o papel do usuário
+            authService.getUserRole(currentUser.uid).then((role) => {
+              if (role === 'admin') {
+                navigate('/admin');
+              } else {
+                navigate('/');
+              }
+            });
+          } else {
+            // Fallback: esperar o AuthContext
+            window.location.href = '/';
+          }
+        }, 500);
       } else {
         const newAttempts = loginAttempts + 1;
         setLoginAttempts(newAttempts);
@@ -193,7 +214,6 @@ const Login: React.FC = () => {
               </p>
             </div>
           )}
-
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
