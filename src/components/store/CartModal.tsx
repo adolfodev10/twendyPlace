@@ -5,8 +5,7 @@ import { X, ShoppingCart, Trash2, Minus, Plus, CreditCard, Upload, File, Check, 
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { cartService } from '../../services/cartService';
-import { storage } from '../../services/firebase';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import axios from "axios";
 
 interface CartModalProps {
   isOpen: boolean;
@@ -267,39 +266,23 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     setUploadProgress(0);
 
     try {
-      const storageRef = ref(storage, `comprovantes/${user?.uid}/${Date.now()}_${file.name}`);
+      const formData = new FormData();
+      formData.append('image', file);
 
-      // Usar uploadBytesResumable para melhor controle
-      const uploadTask = uploadBytesResumable(storageRef, file);
 
-      // Acompanhar progresso
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-        },
-        (error) => {
-          console.error('Erro no upload:', error);
-          toast.error('Erro ao enviar comprovativo. Tente novamente.');
-          setIsUploading(false);
-          setUploadedFile(null);
-        },
-        async () => {
-          // Upload concluído com sucesso
-          try {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            setUploadedFileURL(url);
-            setUploadProgress(100);
-            toast.success('Comprovativo enviado com sucesso!');
-            setIsUploading(false);
-          } catch (error) {
-            console.error('Erro ao obter URL:', error);
-            toast.error('Erro ao processar comprovativo');
-            setIsUploading(false);
-          }
-        }
-      );
+      const response = await axios.post(`https://api.imgbb.com/1/upload?key=${user?.uid}`, {
+        formData
+      });
+
+      const data = await response.data.json();
+
+       if (data.success) {
+      setUploadedFileURL(data.data.url);
+      setUploadProgress(100);
+      toast.success('Comprovativo enviado com sucesso!');
+    } else {
+      toast.error('Erro ao enviar comprovativo. Tente novamente.');
+    }
     } catch (error) {
       console.error('Erro no upload:', error);
       toast.error('Erro ao enviar comprovativo. Tente novamente.');
