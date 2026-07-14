@@ -5,6 +5,8 @@ import { X, ShoppingCart, Trash2, Minus, Plus, CreditCard, Upload, File, Check, 
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { cartService } from '../../services/cartService';
+import { storage } from '../../services/firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 interface CartModalProps {
   isOpen: boolean;
@@ -191,6 +193,37 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
+  // 🔥 VALIDAÇÃO DE ESTOQUE AO ATUALIZAR QUANTIDADE
+  const handleUpdateQuantity = (productId: string, newQty: number) => {
+    const item = items.find(i => i.id === productId);
+    if (!item) return;
+
+    // 🔥 Validar se a nova quantidade não excede o estoque
+    if (newQty > item.stock) {
+      toast.error(`Estoque insuficiente! Apenas ${item.stock} unidades disponíveis.`);
+      return;
+    }
+
+    if (newQty <= 0) {
+      removeItem(productId);
+      return;
+    }
+
+    updateQuantity(productId, newQty);
+  };
+
+  // 🔥 Verificar se algum item excede o estoque antes de finalizar
+  const validateStockBeforeCheckout = () => {
+    for (const item of items) {
+      if (item.qty > item.stock) {
+        toast.error(`${item.name}: você tem ${item.qty} no carrinho, mas só ${item.stock} disponíveis.`);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 🔥 HANDLE CHECKOUT
   const handleCheckout = () => {
     if (!user) {
       toast.error('Faça login para finalizar a compra');
@@ -201,6 +234,12 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
       toast.error('Seu carrinho está vazio');
       return;
     }
+
+    // 🔥 VALIDAR ESTOQUE ANTES DE FINALIZAR
+    if (!validateStockBeforeCheckout()) {
+      return;
+    }
+
     setUploadedFile(null);
     setUploadProgress(0);
     setIsUploading(false);
@@ -208,14 +247,15 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     setShowConfirmModal(true);
   };
 
-  // Substitua a função handleFileUpload por esta:
-
+  // 🔥 HANDLE UPLOAD DE COMPROVATIVO
   const handleFileUpload = async (file: File) => {
+    // Validar tamanho (5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Arquivo muito grande. Máximo 5MB.');
       return;
     }
 
+    // Validar tipo
     const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
     if (!validTypes.includes(file.type)) {
       toast.error('Formato inválido. Use PNG, JPG ou PDF.');
@@ -227,35 +267,56 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     setUploadProgress(0);
 
     try {
-      // 🔥 USAR IMGBB - NÃO PRECISA DE CORS!
-      const formData = new FormData();
-      formData.append('image', file);
+      const storageRef = ref(storage, `comprovantes/${user?.uid}/${Date.now()}_${file.name}`);
 
-      const response = await fetch('https://api.imgbb.com/1/upload?key=4e470b576522a10c52b87edf23905cb3', {
-        method: 'POST',
-        body: formData,
-      });
+      // Usar uploadBytesResumable para melhor controle
+      const uploadTask = uploadBytesResumable(storageRef, file);
 
-      const data = await response.json();
-
-      if (data.success) {
-        setUploadedFileURL(data.data.url);
-        setUploadProgress(100);
-        toast.success('Comprovativo enviado com sucesso!');
-      } else {
-        toast.error('Erro ao enviar comprovativo. Tente novamente.');
-      }
+      // Acompanhar progresso
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        },
+        (error) => {
+          console.error('Erro no upload:', error);
+          toast.error('Erro ao enviar comprovativo. Tente novamente.');
+          setIsUploading(false);
+          setUploadedFile(null);
+        },
+        async () => {
+          // Upload concluído com sucesso
+          try {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            setUploadedFileURL(url);
+            setUploadProgress(100);
+            toast.success('Comprovativo enviado com sucesso!');
+            setIsUploading(false);
+          } catch (error) {
+            console.error('Erro ao obter URL:', error);
+            toast.error('Erro ao processar comprovativo');
+            setIsUploading(false);
+          }
+        }
+      );
     } catch (error) {
       console.error('Erro no upload:', error);
       toast.error('Erro ao enviar comprovativo. Tente novamente.');
-    } finally {
       setIsUploading(false);
     }
   };
 
+  // 🔥 HANDLE CONFIRMAR PEDIDO
   const handleConfirmOrder = async () => {
     if (!uploadedFileURL) {
       toast.error('Envie o comprovativo antes de confirmar');
+      return;
+    }
+
+    // 🔥 Validar estoque novamente antes de finalizar
+    if (!validateStockBeforeCheckout()) {
+      setShowConfirmModal(false);
       return;
     }
 
@@ -279,11 +340,6 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
       );
 
       if (result.success) {
-        if (!result.orderId) {
-          toast.error('ID do pedido inválido. Tente novamente.');
-          return;
-        }
-        await cartService.updateOrderStatus(result.orderId, 'paid');
         clearCart();
         setShowConfirmModal(false);
         onClose();
@@ -334,30 +390,72 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {items.map((item) => (
-                    <div key={item.id} className="flex items-center gap-4 border-b border-gray-100 pb-4">
-                      <img src={item.image} alt={item.name} className="h-16 w-16 rounded-lg object-cover" />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-gray-900 truncate">{item.name}</h4>
-                        <p className="text-sm font-semibold text-primary-600">Kz {item.price.toFixed(2)}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <button onClick={() => updateQuantity(item.id, item.qty - 1)} className="rounded-full p-0.5 hover:bg-gray-100">
-                            <Minus className="h-3 w-3 text-gray-500" />
-                          </button>
-                          <span className="text-sm font-medium w-6 text-center">{item.qty}</span>
-                          <button onClick={() => updateQuantity(item.id, item.qty + 1)} className="rounded-full p-0.5 hover:bg-gray-100">
-                            <Plus className="h-3 w-3 text-gray-500" />
+                  {items.map((item) => {
+                    const isMaxReached = item.qty >= item.stock;
+                    const isOutOfStock = item.stock <= 0;
+
+                    return (
+                      <div key={item.id} className="flex items-center gap-4 border-b border-gray-100 pb-4">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="h-16 w-16 rounded-lg object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64';
+                          }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-medium text-gray-900 truncate">{item.name}</h4>
+                          <p className="text-sm font-semibold text-primary-600">
+                            Kz {item.price.toFixed(2)}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <button
+                              onClick={() => handleUpdateQuantity(item.id, item.qty - 1)}
+                              className="rounded-full p-0.5 hover:bg-gray-100 transition-colors"
+                              aria-label="Diminuir quantidade"
+                              disabled={item.qty <= 1}
+                            >
+                              <Minus className="h-3 w-3 text-gray-500" />
+                            </button>
+                            <span className="text-sm font-medium w-6 text-center">{item.qty}</span>
+                            <button
+                              onClick={() => handleUpdateQuantity(item.id, item.qty + 1)}
+                              className="rounded-full p-0.5 hover:bg-gray-100 transition-colors"
+                              aria-label="Aumentar quantidade"
+                              disabled={isMaxReached || isOutOfStock}
+                            >
+                              <Plus className="h-3 w-3 text-gray-500" />
+                            </button>
+                          </div>
+                          {/* INFO DE ESTOQUE */}
+                          <div className="flex items-center gap-2 mt-1">
+                            {isOutOfStock ? (
+                              <span className="text-xs text-red-500">Esgotado</span>
+                            ) : isMaxReached ? (
+                              <span className="text-xs text-orange-500">Limite atingido</span>
+                            ) : (
+                              <span className="text-xs text-gray-500">
+                                {item.stock - item.qty} disponíveis
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">
+                            Kz {(item.price * item.qty).toFixed(2)}
+                          </p>
+                          <button
+                            onClick={() => removeItem(item.id)}
+                            className="text-red-500 hover:text-red-700 transition-colors"
+                            aria-label="Remover item"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900">Kz {(item.price * item.qty).toFixed(2)}</p>
-                        <button onClick={() => removeItem(item.id)} className="text-red-500 hover:text-red-700">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -382,7 +480,10 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
                   <button onClick={clearCart} className="flex-1 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg">
                     Limpar
                   </button>
-                  <button onClick={handleCheckout} className="flex-1 flex items-center justify-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">
+                  <button
+                    onClick={handleCheckout}
+                    className="flex-1 flex items-center justify-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+                  >
                     <CreditCard className="h-4 w-4" />
                     Finalizar
                   </button>
@@ -390,7 +491,9 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
 
                 {!user && (
                   <p className="mt-2 text-center text-xs text-gray-500">
-                    <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">Faça login</Link> para finalizar a compra
+                    <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
+                      Faça login
+                    </Link> para finalizar a compra
                   </p>
                 )}
               </div>
@@ -399,6 +502,7 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
         </div>
       </div>
 
+      {/* Modal de Confirmação */}
       <ConfirmModal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}

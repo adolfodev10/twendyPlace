@@ -32,28 +32,28 @@ const Store: React.FC = () => {
     const loadProducts = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         // 🔥 BUSCAR PRODUTOS NORMAIS E DE PARCEIROS
         const [normalProducts, partnerProducts] = await Promise.all([
           productService.getAllProducts(),
           partnerService.getPartnerProductsForStore()
         ]);
-        
+
         // 🔥 COMBINAR PRODUTOS
         let allProducts = [...normalProducts, ...partnerProducts];
-        
+
         // 🔥 REMOVER DUPLICATAS (por nome)
-        const uniqueProducts = allProducts.filter((product, index, self) => 
+        const uniqueProducts = allProducts.filter((product, index, self) =>
           index === self.findIndex(p => p.name === product.name)
         );
-        
+
         // 🔥 ORDENAR POR NOME
         uniqueProducts.sort((a, b) => a.name.localeCompare(b.name));
-        
+
         setProducts(uniqueProducts);
         setFilteredProducts(uniqueProducts);
-        
+
         if (uniqueProducts.length === 0) {
           setError('Nenhum produto disponível no momento.');
         }
@@ -65,7 +65,7 @@ const Store: React.FC = () => {
         setLoading(false);
       }
     };
-    
+
     loadProducts();
   }, []);
 
@@ -111,7 +111,7 @@ const Store: React.FC = () => {
     });
   };
 
-  const hasActiveFilters = filters.search || filters.category !== 'all' || 
+  const hasActiveFilters = filters.search || filters.category !== 'all' ||
     filters.brands.length > 0 || filters.rating > 0 || filters.maxPrice < 10000;
 
   if (loading) {
@@ -161,8 +161,8 @@ const Store: React.FC = () => {
                 <ShoppingBag className="w-16 h-16 mx-auto text-gray-300 mb-4" />
                 <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Nenhum produto encontrado</h3>
                 <p className="text-gray-500 mt-2 text-sm sm:text-base">
-                  {products.length === 0 
-                    ? 'Não há produtos disponíveis no momento.' 
+                  {products.length === 0
+                    ? 'Não há produtos disponíveis no momento.'
                     : 'Tente ajustar os filtros ou a pesquisa'}
                 </p>
                 {hasActiveFilters && (
@@ -181,7 +181,7 @@ const Store: React.FC = () => {
                 <div className="flex flex-col sm:flex-row flex-wrap justify-between items-start sm:items-center gap-3 mb-4">
                   <p className="text-sm text-gray-500 flex items-center gap-2">
                     <Package className="w-4 h-4 text-gray-400" />
-                    Mostrando <span className="font-semibold text-gray-700 mx-1">{filteredProducts.length}</span> 
+                    Mostrando <span className="font-semibold text-gray-700 mx-1">{filteredProducts.length}</span>
                     de <span className="font-semibold text-gray-700 mx-1">{products.length}</span> produtos disponíveis
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
