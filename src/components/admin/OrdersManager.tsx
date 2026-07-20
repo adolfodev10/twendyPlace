@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { cartService } from '../../services/cartService';
 import { Order } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -26,7 +26,7 @@ import {
     Check,
     Trash2,
     CheckSquare,
-    Square,
+    Square
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -178,7 +178,7 @@ const ConfirmModal: React.FC<{
     );
 };
 
-// 🔥 ATUALIZADO: Modal de Exclusão em Massa
+// Modal de Exclusão em Massa
 const BulkDeleteConfirmModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -201,8 +201,7 @@ const BulkDeleteConfirmModal: React.FC<{
                         Tem certeza que deseja eliminar <strong>{selectedCount}</strong> pedido{selectedCount > 1 ? 's' : ''} selecionado{selectedCount > 1 ? 's' : ''}?
                     </p>
                     <p className="text-sm text-red-500 mt-1">Esta ação não pode ser desfeita.</p>
-
-                    {/* Resumo dos pedidos que serão deletados */}
+                    
                     <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                         <p className="text-xs text-gray-500">
                             Apenas pedidos <span className="font-semibold text-red-600">Cancelados</span> ou <span className="font-semibold text-green-600">Entregues</span> podem ser eliminados.
@@ -252,7 +251,7 @@ const OrdersManager: React.FC = () => {
     const [viewingProof, setViewingProof] = useState<{ orderId: string; url: string } | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    // 🔥 NOVO: Estado para seleção múltipla
+    // Seleção múltipla
     const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
     const [selectAll, setSelectAll] = useState(false);
 
@@ -272,7 +271,6 @@ const OrdersManager: React.FC = () => {
         hasProof: false,
     });
 
-    // 🔥 ATUALIZADO: Estado para modal de exclusão em massa
     const [bulkDeleteModal, setBulkDeleteModal] = useState<{
         isOpen: boolean;
     }>({
@@ -300,7 +298,7 @@ const OrdersManager: React.FC = () => {
         return () => unsubscribe();
     }, [filter]);
 
-    // 🔥 Limpar seleção quando o filtro mudar
+    // Limpar seleção quando o filtro ou busca mudar
     useEffect(() => {
         setSelectedOrders(new Set());
         setSelectAll(false);
@@ -319,19 +317,40 @@ const OrdersManager: React.FC = () => {
         prevOrdersRef.current = newOrders;
     };
 
-    // 🔥 NOVO: Funções de seleção
-    const toggleOrderSelection = (orderId: string) => {
-        const newSelected = new Set(selectedOrders);
-        if (newSelected.has(orderId)) {
-            newSelected.delete(orderId);
-        } else {
-            newSelected.add(orderId);
-        }
-        setSelectedOrders(newSelected);
+    // Filtrar pedidos com base na busca
+    const filteredOrders = useMemo(() => {
+        return orders.filter(order => {
+            if (!search) return true;
+            const searchLower = search.toLowerCase();
+            return (
+                order.orderNumber?.toLowerCase().includes(searchLower) ||
+                order.customer?.name?.toLowerCase().includes(searchLower) ||
+                order.customer?.email?.toLowerCase().includes(searchLower)
+            );
+        });
+    }, [orders, search]);
 
-        // Atualizar estado de selecionar todos
-        const deletableOrders = getDeletableOrders();
-        setSelectAll(newSelected.size === deletableOrders.length && deletableOrders.length > 0);
+    // Obter pedidos que podem ser deletados (cancelados ou entregues)
+    const getDeletableOrders = useMemo(() => {
+        return filteredOrders.filter(order => 
+            order.status === 'cancelled' || order.status === 'delivered'
+        );
+    }, [filteredOrders]);
+
+    // Verificar se há pedidos selecionáveis
+    const hasSelectableOrders = getDeletableOrders.length > 0;
+
+    // Funções de seleção
+    const toggleOrderSelection = (orderId: string) => {
+        setSelectedOrders(prev => {
+            const newSelected = new Set(prev);
+            if (newSelected.has(orderId)) {
+                newSelected.delete(orderId);
+            } else {
+                newSelected.add(orderId);
+            }
+            return newSelected;
+        });
     };
 
     const toggleSelectAll = () => {
@@ -339,22 +358,20 @@ const OrdersManager: React.FC = () => {
             setSelectedOrders(new Set());
             setSelectAll(false);
         } else {
-            const deletableOrders = getDeletableOrders();
-            const allIds = new Set(deletableOrders.map(order => order.id));
+            const allIds = new Set(getDeletableOrders.map(order => order.id));
             setSelectedOrders(allIds);
             setSelectAll(true);
         }
     };
 
-    // Obter pedidos que podem ser deletados (cancelados ou entregues)
-    const getDeletableOrders = () => {
-        return filteredOrders.filter(order =>
-            order.status === 'cancelled' || order.status === 'delivered'
-        );
-    };
-
-    // Verificar se há pedidos selecionáveis
-    const hasSelectableOrders = getDeletableOrders().length > 0;
+    // Sincronizar selectAll com a quantidade de selecionados
+    useEffect(() => {
+        if (getDeletableOrders.length > 0) {
+            setSelectAll(selectedOrders.size === getDeletableOrders.length);
+        } else {
+            setSelectAll(false);
+        }
+    }, [selectedOrders, getDeletableOrders]);
 
     const isTransitionAllowed = (fromStatus: string, toStatus: string): boolean => {
         if (fromStatus === toStatus) return false;
@@ -388,7 +405,6 @@ const OrdersManager: React.FC = () => {
         });
     };
 
-    // 🔥 NOVO: Abrir modal de exclusão em massa
     const openBulkDeleteModal = () => {
         if (selectedOrders.size === 0) {
             toast.error('Selecione pelo menos um pedido para eliminar');
@@ -487,16 +503,15 @@ const OrdersManager: React.FC = () => {
         }
     };
 
-    // 🔥 ATUALIZADO: Executar exclusão em massa
+    // Executar exclusão em massa
     const executeBulkDelete = async () => {
         if (selectedOrders.size === 0) return;
-
+        
         setDeleting(true);
         let successCount = 0;
         let errorCount = 0;
 
         try {
-            // Processar em lotes de 10 para não sobrecarregar
             const orderIds = Array.from(selectedOrders);
             const batchSize = 10;
 
@@ -527,16 +542,13 @@ const OrdersManager: React.FC = () => {
                         await stockBatch.commit();
                     }
 
-                    // Marcar para deletar
                     batch.delete(orderRef);
                     successCount++;
                 }
 
-                // Executar o lote
                 await batch.commit();
             }
 
-            // Limpar seleção
             setSelectedOrders(new Set());
             setSelectAll(false);
             setBulkDeleteModal({ isOpen: false });
@@ -548,7 +560,6 @@ const OrdersManager: React.FC = () => {
                 toast.error(`${errorCount} pedido(s) não encontrado(s)`);
             }
 
-            // Recarregar lista
             setLoading(true);
             setTimeout(() => setLoading(false), 500);
 
@@ -658,16 +669,6 @@ const OrdersManager: React.FC = () => {
         }
     };
 
-    const filteredOrders = orders.filter(order => {
-        if (!search) return true;
-        const searchLower = search.toLowerCase();
-        return (
-            order.orderNumber?.toLowerCase().includes(searchLower) ||
-            order.customer?.name?.toLowerCase().includes(searchLower) ||
-            order.customer?.email?.toLowerCase().includes(searchLower)
-        );
-    });
-
     if (loading) {
         return (
             <div className="flex items-center justify-center h-96">
@@ -691,7 +692,7 @@ const OrdersManager: React.FC = () => {
                 warning={confirmModal.newStatus === 'paid' ? 'Ao confirmar, o pagamento será validado e o cliente será notificado.' : undefined}
             />
 
-            {/* 🔥 ATUALIZADO: Modal de Exclusão em Massa */}
+            {/* Modal de Exclusão em Massa */}
             <BulkDeleteConfirmModal
                 isOpen={bulkDeleteModal.isOpen}
                 onClose={() => setBulkDeleteModal({ isOpen: false })}
@@ -723,7 +724,7 @@ const OrdersManager: React.FC = () => {
                     </p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                    {/* 🔥 Botão de exclusão em massa */}
+                    {/* Botão de exclusão em massa */}
                     {selectedOrders.size > 0 && (
                         <button
                             onClick={openBulkDeleteModal}
@@ -784,7 +785,7 @@ const OrdersManager: React.FC = () => {
                     <table className="w-full min-w-[1050px]">
                         <thead className="bg-gray-50">
                             <tr>
-                                {/* 🔥 NOVO: Coluna de checkbox */}
+                                {/* Coluna de checkbox */}
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 w-12">
                                     {hasSelectableOrders && (
                                         <button
@@ -844,7 +845,7 @@ const OrdersManager: React.FC = () => {
 
                                     return (
                                         <tr key={order.id} className={`border-b border-gray-100 transition-colors ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}>
-                                            {/* 🔥 Checkbox de seleção */}
+                                            {/* Checkbox de seleção */}
                                             <td className="py-3 px-3 sm:px-4">
                                                 {isDeletable && (
                                                     <button
@@ -950,7 +951,7 @@ const OrdersManager: React.FC = () => {
                     </table>
                 </div>
 
-                {/* 🔥 NOVO: Barra de status da seleção */}
+                {/* Barra de status da seleção */}
                 {selectedOrders.size > 0 && (
                     <div className="bg-primary-50 border-t border-primary-200 px-4 py-3 flex items-center justify-between">
                         <p className="text-sm text-primary-700">
