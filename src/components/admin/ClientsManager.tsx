@@ -35,7 +35,7 @@ const ClientsManager: React.FC = () => {
         uid: doc.id,
         ...doc.data()
       })) as User[];
-      
+
       setClients(clientsData);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
@@ -107,10 +107,10 @@ const ClientsManager: React.FC = () => {
 
     try {
       const clientIds = Array.from(selectedClients);
-      
+
       // Processar em lotes de 10
       const batchSize = 10;
-      
+
       for (let i = 0; i < clientIds.length; i += batchSize) {
         const batch = writeBatch(db);
         const batchIds = clientIds.slice(i, i + batchSize);
@@ -146,7 +146,7 @@ const ClientsManager: React.FC = () => {
 
   // 🔥 NOVO: Exportar clientes selecionados para CSV
   const exportSelectedToCSV = () => {
-    const clientsToExport = selectedClients.size > 0 
+    const clientsToExport = selectedClients.size > 0
       ? filteredClients.filter(c => selectedClients.has(c.uid))
       : filteredClients;
 
@@ -195,7 +195,7 @@ const ClientsManager: React.FC = () => {
           <Users className="w-6 h-6 text-primary-600" />
           Gerenciar Clientes
         </h1>
-        
+
         {/* 🔥 NOVO: Botões de ação */}
         <div className="flex items-center gap-2 w-full sm:w-auto">
           {/* Botão de exportar */}
@@ -207,7 +207,7 @@ const ClientsManager: React.FC = () => {
             <Download className="w-4 h-4" />
             Exportar {selectedClients.size > 0 ? `(${selectedClients.size})` : 'Todos'}
           </button>
-          
+
           {/* Botão de exclusão em massa */}
           {selectedClients.size > 0 && (
             <button
@@ -271,15 +271,14 @@ const ClientsManager: React.FC = () => {
         ) : (
           filteredClients.map(client => {
             const isSelected = selectedClients.has(client.uid);
-            
+
             return (
-              <div 
-                key={client.uid} 
-                className={`bg-white rounded-xl border-2 p-6 transition-all cursor-pointer ${
-                  isSelected 
-                    ? 'border-primary-500 shadow-md shadow-primary-100 bg-primary-50/30' 
+              <div
+                key={client.uid}
+                className={`bg-white rounded-xl border-2 p-6 transition-all cursor-pointer ${isSelected
+                    ? 'border-primary-500 shadow-md shadow-primary-100 bg-primary-50/30'
                     : 'border-gray-200 hover:shadow-md hover:border-gray-300'
-                }`}
+                  }`}
                 onClick={() => toggleClientSelection(client.uid)}
               >
                 <div className="flex items-center justify-between mb-4">
@@ -294,18 +293,17 @@ const ClientsManager: React.FC = () => {
                       <p className="text-sm text-gray-500">Cliente</p>
                     </div>
                   </div>
-                  
+
                   {/* 🔥 NOVO: Checkbox de seleção */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleClientSelection(client.uid);
                     }}
-                    className={`p-1 rounded-lg transition-colors ${
-                      isSelected 
-                        ? 'text-primary-600 hover:bg-primary-100' 
+                    className={`p-1 rounded-lg transition-colors ${isSelected
+                        ? 'text-primary-600 hover:bg-primary-100'
                         : 'text-gray-400 hover:bg-gray-100'
-                    }`}
+                      }`}
                     title={isSelected ? 'Desmarcar' : 'Selecionar'}
                   >
                     {isSelected ? (
@@ -396,7 +394,7 @@ const ClientsManager: React.FC = () => {
                 Tem certeza que deseja excluir <strong>{selectedClients.size}</strong> cliente{selectedClients.size > 1 ? 's' : ''}?
               </p>
               <p className="text-sm text-red-500 mt-1">Esta ação não pode ser desfeita. Todos os dados dos clientes serão permanentemente removidos.</p>
-              
+
               <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-left">
                 <p className="text-xs text-yellow-700">
                   <strong>Atenção:</strong> Os pedidos associados a estes clientes não serão excluídos automaticamente.
