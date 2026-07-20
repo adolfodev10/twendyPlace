@@ -276,8 +276,8 @@ const ClientsManager: React.FC = () => {
               <div
                 key={client.uid}
                 className={`bg-white rounded-xl border-2 p-6 transition-all cursor-pointer ${isSelected
-                    ? 'border-primary-500 shadow-md shadow-primary-100 bg-primary-50/30'
-                    : 'border-gray-200 hover:shadow-md hover:border-gray-300'
+                  ? 'border-primary-500 shadow-md shadow-primary-100 bg-primary-50/30'
+                  : 'border-gray-200 hover:shadow-md hover:border-gray-300'
                   }`}
                 onClick={() => toggleClientSelection(client.uid)}
               >
@@ -301,8 +301,8 @@ const ClientsManager: React.FC = () => {
                       toggleClientSelection(client.uid);
                     }}
                     className={`p-1 rounded-lg transition-colors ${isSelected
-                        ? 'text-primary-600 hover:bg-primary-100'
-                        : 'text-gray-400 hover:bg-gray-100'
+                      ? 'text-primary-600 hover:bg-primary-100'
+                      : 'text-gray-400 hover:bg-gray-100'
                       }`}
                     title={isSelected ? 'Desmarcar' : 'Selecionar'}
                   >
