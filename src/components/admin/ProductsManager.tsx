@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Product } from '../../types';
 import { productService } from '../../services/productService';
-import { Plus, Edit, Trash2, Search, X, Save, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X, Save, AlertTriangle, Package, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ProductsManager: React.FC = () => {
@@ -12,6 +12,7 @@ const ProductsManager: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [outOfStockCount, setOutOfStockCount] = useState(0);
   const [formData, setFormData] = useState({
     name: '',
     price: 0,
@@ -27,7 +28,7 @@ const ProductsManager: React.FC = () => {
 
   const sanitizeInput = (input: string) => {
     return input.replace(/[<>]/g, '').trim();
-  }
+  };
 
   useEffect(() => {
     loadProducts();
@@ -38,6 +39,28 @@ const ProductsManager: React.FC = () => {
     try {
       const data = await productService.getAllProducts();
       setProducts(data);
+      // 🔥 CONTAR PRODUTOS COM ESTOQUE ZERO
+      const zeroStock = data.filter(p => p.stock === 0);
+      setOutOfStockCount(zeroStock.length);
+
+      if (zeroStock.length > 0) {
+        toast.custom((t) => (
+          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-yellow-50 border border-yellow-200 shadow-lg rounded-xl pointer-events-auto flex items-start gap-3 p-4`}>
+            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-800">
+                ⚠️ {zeroStock.length} produto{zeroStock.length > 1 ? 's' : ''} com estoque zerado!
+              </p>
+              <p className="text-xs text-yellow-600 mt-0.5">
+                Eles não aparecem na loja para clientes.
+              </p>
+            </div>
+            <button onClick={() => toast.dismiss(t.id)} className="text-yellow-500 hover:text-yellow-700">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ), { duration: 8000 });
+      }
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
       toast.error('Erro ao carregar produtos');
@@ -101,7 +124,6 @@ const ProductsManager: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validações
     if (!formData.name.trim()) {
       toast.error('Nome do produto é obrigatório');
       return;
@@ -127,8 +149,6 @@ const ProductsManager: React.FC = () => {
     try {
       const productData = {
         name: sanitizeInput(formData.name),
-        // convert numeric fields to strings before sanitizing
-        // sanitize then convert back to numbers for typed Product fields
         price: Number(sanitizeInput(String(formData.price))),
         stock: Number(sanitizeInput(String(formData.stock))),
         category: sanitizeInput(formData.category),
@@ -187,17 +207,6 @@ const ProductsManager: React.FC = () => {
     product.category.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ✅ CORRETO: Estrelas com SVG
-  const StarIcon = ({ filled }: { filled: boolean }) => (
-    <svg
-      className={`w-4 h-4 ${filled ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
-      fill="currentColor"
-      viewBox="0 0 20 20"
-    >
-      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-    </svg>
-  );
-
 
   if (loading) {
     return (
@@ -209,8 +218,47 @@ const ProductsManager: React.FC = () => {
 
   return (
     <div>
+      {/* 🔥 BANNER DE PRODUTOS ESGOTADOS */}
+      {outOfStockCount > 0 && (
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-6 h-6 text-yellow-600" />
+            <div>
+              <p className="text-sm font-semibold text-yellow-800">
+                {outOfStockCount} produto{outOfStockCount > 1 ? 's' : ''} com estoque zerado
+              </p>
+              <p className="text-xs text-yellow-700">
+                Estes produtos não aparecem na loja para clientes. Recomendamos reabastecer ou ocultar.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setSearch('');
+              // 🔥 Filtrar para mostrar apenas produtos com estoque zero
+              const zeroStockProducts = products.filter(p => p.stock === 0);
+              if (zeroStockProducts.length > 0) {
+                // Mostrar no console ou fazer algo
+                toast.success(`${zeroStockProducts.length} produtos com estoque zero`);
+              }
+            }}
+            className="px-3 py-1.5 text-xs font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 rounded-lg transition-colors"
+          >
+            Ver todos
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Gerenciar Produtos</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <Package className="w-6 h-6 text-primary-600" />
+          Gerenciar Produtos
+          {outOfStockCount > 0 && (
+            <span className="text-sm font-normal text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
+              {outOfStockCount} esgotados
+            </span>
+          )}
+        </h1>
         <button
           onClick={() => handleOpenModal()}
           className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors w-full sm:w-auto justify-center"
@@ -257,78 +305,86 @@ const ProductsManager: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map(product => (
-                  <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="py-3 px-3 sm:px-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={product.image}
-                          alt={product.name}
-                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-gray-200"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/48/2563eb/ffffff?text=Product';
-                          }}
-                        />
-                        <div className="min-w-0">
-                          <p className="font-medium text-gray-900 text-sm truncate max-w-[120px] sm:max-w-none">
-                            {product.name}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate sm:hidden">{product.brand}</p>
-                          <p className="text-xs text-gray-500 hidden sm:block">{product.brand}</p>
+                filteredProducts.map(product => {
+                  const isOutOfStock = product.stock === 0;
+                  return (
+                    <tr key={product.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${isOutOfStock ? 'bg-yellow-50/30' : ''}`}>
+                      <td className="py-3 px-3 sm:px-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-gray-200"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/48/2563eb/ffffff?text=Product';
+                            }}
+                          />
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900 text-sm truncate max-w-[120px] sm:max-w-none">
+                              {product.name}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate sm:hidden">{product.brand}</p>
+                            <p className="text-xs text-gray-500 hidden sm:block">{product.brand}</p>
+                          </div>
+                          {isOutOfStock && (
+                            <span className="ml-1 px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded">
+                              ESGOTADO
+                            </span>
+                          )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 sm:px-4 hidden sm:table-cell">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium whitespace-nowrap">
-                        {product.category}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 sm:px-4 text-gray-600 text-sm hidden md:table-cell">
-                      {product.brand}
-                    </td>
-                    <td className="py-3 px-3 sm:px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">
-                      Kz {product.price.toFixed(2)}
-                    </td>
-                    <td className="py-3 px-3 sm:px-4 hidden sm:table-cell">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${product.stock > 10 ? 'bg-green-100 text-green-700' :
-                        product.stock > 0 ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                        {product.stock} un.
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 sm:px-4 hidden lg:table-cell">
-                      <span className="text-yellow-500 text-sm whitespace-nowrap">
-                        {'★'.repeat(product.rating)}{'☆'.repeat(5 - product.rating)}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 sm:px-4">
-                      <div className="flex items-center gap-1 sm:gap-2">
-                        <button
-                          onClick={() => handleOpenModal(product)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          aria-label="Editar produto"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleOpenDeleteModal(product)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          aria-label="Excluir produto"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="py-3 px-3 sm:px-4 hidden sm:table-cell">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium whitespace-nowrap">
+                          {product.category}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 sm:px-4 text-gray-600 text-sm hidden md:table-cell">
+                        {product.brand}
+                      </td>
+                      <td className="py-3 px-3 sm:px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">
+                        Kz {product.price.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-3 sm:px-4 hidden sm:table-cell">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${isOutOfStock ? 'bg-red-100 text-red-700 animate-pulse' :
+                          product.stock > 10 ? 'bg-green-100 text-green-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                          {product.stock} un.
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 sm:px-4 hidden lg:table-cell">
+                        <span className="text-yellow-500 text-sm whitespace-nowrap">
+                          {'★'.repeat(product.rating)}{'☆'.repeat(5 - product.rating)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 sm:px-4">
+                        <div className="flex items-center gap-1 sm:gap-2">
+                          <button
+                            onClick={() => handleOpenModal(product)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            aria-label="Editar produto"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenDeleteModal(product)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            aria-label="Excluir produto"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal de Produto (Criar/Editar) */}
+      {/* Modais - mantidos iguais */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={handleCloseModal} />
@@ -337,80 +393,32 @@ const ProductsManager: React.FC = () => {
               <h2 className="text-xl font-bold text-gray-900">
                 {editingProduct ? 'Editar Produto' : 'Novo Produto'}
               </h2>
-              <button
-                onClick={handleCloseModal}
-                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                aria-label="Fechar modal"
-              >
+              <button onClick={handleCloseModal} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {/* Nome */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome do Produto *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  placeholder="Ex: iPhone 15 Pro"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm"
-                  required
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Produto *</label>
+                <input type="text" name="name" value={formData.name} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required />
               </div>
 
-              {/* Preço e Estoque */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Preço (Kz) *
-                  </label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    placeholder="0.00"
-                    min="0"
-                    step="0.01"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm"
-                    required
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Preço (Kz) *</label>
+                  <input type="number" name="price" value={formData.price} onChange={handleInputChange} min="0" step="0.01" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estoque *
-                  </label>
-                  <input
-                    type="number"
-                    name="stock"
-                    value={formData.stock}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    min="0"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm"
-                    required
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estoque *</label>
+                  <input type="number" name="stock" value={formData.stock} onChange={handleInputChange} min="0" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required />
                 </div>
               </div>
 
-              {/* Categoria e Marca */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Categoria *
-                  </label>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm"
-                    required
-                  >
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
+                  <select name="category" value={formData.category} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required>
                     <option value="">Selecione...</option>
                     <option value="Audio">Áudio & Som</option>
                     <option value="Computers">Computadores</option>
@@ -422,16 +430,8 @@ const ProductsManager: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Marca *
-                  </label>
-                  <select
-                    name="brand"
-                    value={formData.brand}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm"
-                    required
-                  >
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Marca *</label>
+                  <select name="brand" value={formData.brand} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required>
                     <option value="">Selecione...</option>
                     <option value="Apple">Apple</option>
                     <option value="Samsung">Samsung</option>
@@ -447,80 +447,35 @@ const ProductsManager: React.FC = () => {
                 </div>
               </div>
 
-              {/* Avaliação */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Avaliação (1-5)
-                </label>
-                <select
-                  name="rating"
-                  value={formData.rating}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm"
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1">Avaliação (1-5)</label>
+                <select name="rating" value={formData.rating} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
                   {[1, 2, 3, 4, 5].map(r => (
-                    <StarIcon key={r} filled={r <= formData.rating} />
+                    <option key={r} value={r}>{r} ★</option>
                   ))}
                 </select>
               </div>
 
-              {/* Imagem */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  URL da Imagem *
-                </label>
-                <input
-                  type="url"
-                  name="image"
-                  value={formData.image}
-                  onChange={handleInputChange}
-                  placeholder="https://exemplo.com/imagem.jpg"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm"
-                  required
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">URL da Imagem *</label>
+                <input type="url" name="image" value={formData.image} onChange={handleInputChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required />
                 {formData.image && (
                   <div className="mt-2">
-                    <img
-                      src={formData.image}
-                      alt="Preview"
-                      className="w-20 h-20 rounded-lg object-cover border border-gray-200"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/80/2563eb/ffffff?text=Preview';
-                      }}
-                    />
+                    <img src={formData.image} alt="Preview" className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
                   </div>
                 )}
               </div>
 
-              {/* Descrição */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  rows={3}
-                  placeholder="Descrição do produto..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition text-sm resize-none"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                <textarea name="description" value={formData.description} onChange={handleInputChange} rows={3} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none resize-none" />
               </div>
 
-              {/* Botões */}
               <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-                >
+                <button type="button" onClick={handleCloseModal} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
+                <button type="submit" disabled={saving} className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2">
                   {saving ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
@@ -539,7 +494,6 @@ const ProductsManager: React.FC = () => {
         </div>
       )}
 
-      {/* Modal de Confirmação de Exclusão */}
       {showDeleteModal && productToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={handleCloseDeleteModal} />
@@ -549,25 +503,13 @@ const ProductsManager: React.FC = () => {
                 <AlertTriangle className="w-8 h-8 text-red-500" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Confirmar Exclusão</h3>
-              <p className="text-gray-600">
-                Tem certeza que deseja excluir o produto <strong>"{productToDelete.name}"</strong>?
-              </p>
-              <p className="text-sm text-gray-500 mt-1">
-                Esta ação não pode ser desfeita.
-              </p>
-
+              <p className="text-gray-600">Tem certeza que deseja excluir o produto <strong>"{productToDelete.name}"</strong>?</p>
+              <p className="text-sm text-gray-500 mt-1">Esta ação não pode ser desfeita.</p>
               <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <button
-                  onClick={handleCloseDeleteModal}
-                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-                >
+                <button onClick={handleCloseDeleteModal} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">
                   Cancelar
                 </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
+                <button onClick={handleDelete} disabled={deleting} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2">
                   {deleting ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />

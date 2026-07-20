@@ -15,8 +15,12 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
 
   const isAdmin = user?.role === 'admin';
 
+  // 🔥 FILTRAR PRODUTOS COM ESTOQUE > 0 (para clientes)
+  const availableProducts = isAdmin
+    ? products
+    : products.filter(p => p.stock > 0);
+
   const handleAddToCart = (product: Product) => {
-    // 🔥 BLOQUEAR ADMIN
     if (isAdmin) {
       toast.error('Administradores não podem comprar produtos!', {
         duration: 4000,
@@ -24,7 +28,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
       return;
     }
 
-    // 🔥 VERIFICAR ESTOQUE DISPONÍVEL
     const currentInCart = items.find(item => item.id === product.id);
     const currentQty = currentInCart?.qty || 0;
 
@@ -52,19 +55,21 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
     ));
   };
 
-  if (products.length === 0) {
+  if (availableProducts.length === 0) {
     return (
       <div className="text-center py-12 sm:py-16 col-span-full">
         <Package className="w-16 h-16 mx-auto text-gray-300 mb-4" />
         <h3 className="text-lg font-semibold text-gray-900">Nenhum produto disponível</h3>
-        <p className="text-gray-500 mt-2 text-sm">Volte em breve para ver nossas novidades</p>
+        <p className="text-gray-500 mt-2 text-sm">
+          {isAdmin ? 'Todos os produtos estão esgotados.' : 'Volte em breve para ver nossas novidades'}
+        </p>
       </div>
     );
   }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-      {products.map((product) => {
+      {availableProducts.map((product) => {
         const currentInCart = items.find(item => item.id === product.id);
         const currentQty = currentInCart?.qty || 0;
         const isOutOfStock = product.stock <= 0;
@@ -165,7 +170,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
                 </button>
               </div>
 
-              {/* 🔥 INFO DE ESTOQUE NO CARRINHO */}
               {currentQty > 0 && !isAdmin && (
                 <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
                   <Package className="w-3 h-3" />
