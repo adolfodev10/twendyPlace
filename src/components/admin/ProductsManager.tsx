@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Product } from '../../types';
 import { productService } from '../../services/productService';
-import { Plus, Edit, Trash2, Search, X, Save, AlertTriangle, Package, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X, Save, AlertTriangle, Package, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ProductsManager: React.FC = () => {
@@ -26,6 +26,11 @@ const ProductsManager: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // 🔥 NOVO: Estados para seleção múltipla
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+
   const sanitizeInput = (input: string) => {
     return input.replace(/[<>]/g, '').trim();
   };
@@ -34,12 +39,17 @@ const ProductsManager: React.FC = () => {
     loadProducts();
   }, []);
 
+  // Limpar seleção quando a busca mudar
+  useEffect(() => {
+    setSelectedProducts(new Set());
+    setSelectAll(false);
+  }, [search]);
+
   const loadProducts = async () => {
     setLoading(true);
     try {
       const data = await productService.getAllProducts();
       setProducts(data);
-      // 🔥 CONTAR PRODUTOS COM ESTOQUE ZERO
       const zeroStock = data.filter(p => p.stock === 0);
       setOutOfStockCount(zeroStock.length);
 
@@ -201,12 +211,101 @@ const ProductsManager: React.FC = () => {
     }
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(search.toLowerCase()) ||
-    product.brand.toLowerCase().includes(search.toLowerCase()) ||
-    product.category.toLowerCase().includes(search.toLowerCase())
-  );
+  // 🔥 NOVO: Executar exclusão em massa
+  const executeBulkDelete = async () => {
+    if (selectedProducts.size === 0) return;
 
+    setDeleting(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      const productIds = Array.from(selectedProducts);
+
+      for (const productId of productIds) {
+        try {
+          const result = await productService.deleteProduct(productId);
+          if (result.success) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`Erro ao excluir produto ${productId}:`, error);
+        }
+      }
+
+      setSelectedProducts(new Set());
+      setSelectAll(false);
+      setShowBulkDeleteModal(false);
+
+      if (successCount > 0) {
+        toast.success(`${successCount} produto(s) excluído(s) com sucesso!`);
+      }
+      if (errorCount > 0) {
+        toast.error(`${errorCount} produto(s) não puderam ser excluídos`);
+      }
+
+      loadProducts();
+    } catch (error) {
+      console.error('Erro ao excluir produtos:', error);
+      toast.error('Erro ao excluir produtos');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // 🔥 NOVO: Funções de seleção
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProducts(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(productId)) {
+        newSelected.delete(productId);
+      } else {
+        newSelected.add(productId);
+      }
+      return newSelected;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedProducts(new Set());
+      setSelectAll(false);
+    } else {
+      const allIds = new Set(filteredProducts.map(product => product.id));
+      setSelectedProducts(allIds);
+      setSelectAll(true);
+    }
+  };
+
+  // 🔥 NOVO: Abrir modal de exclusão em massa
+  const openBulkDeleteModal = () => {
+    if (selectedProducts.size === 0) {
+      toast.error('Selecione pelo menos um produto para excluir');
+      return;
+    }
+    setShowBulkDeleteModal(true);
+  };
+
+  // Filtrar produtos
+  const filteredProducts = useMemo(() => {
+    return products.filter(product =>
+      product.name.toLowerCase().includes(search.toLowerCase()) ||
+      product.brand.toLowerCase().includes(search.toLowerCase()) ||
+      product.category.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [products, search]);
+
+  // Sincronizar selectAll
+  useEffect(() => {
+    if (filteredProducts.length > 0) {
+      setSelectAll(selectedProducts.size === filteredProducts.length);
+    } else {
+      setSelectAll(false);
+    }
+  }, [selectedProducts, filteredProducts]);
 
   if (loading) {
     return (
@@ -218,7 +317,7 @@ const ProductsManager: React.FC = () => {
 
   return (
     <div>
-      {/* 🔥 BANNER DE PRODUTOS ESGOTADOS */}
+      {/* Banner de Produtos Esgotados */}
       {outOfStockCount > 0 && (
         <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
@@ -235,10 +334,8 @@ const ProductsManager: React.FC = () => {
           <button
             onClick={() => {
               setSearch('');
-              // 🔥 Filtrar para mostrar apenas produtos com estoque zero
               const zeroStockProducts = products.filter(p => p.stock === 0);
               if (zeroStockProducts.length > 0) {
-                // Mostrar no console ou fazer algo
                 toast.success(`${zeroStockProducts.length} produtos com estoque zero`);
               }
             }}
@@ -259,13 +356,25 @@ const ProductsManager: React.FC = () => {
             </span>
           )}
         </h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors w-full sm:w-auto justify-center"
-        >
-          <Plus className="w-4 h-4" />
-          Novo Produto
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* 🔥 NOVO: Botão de exclusão em massa */}
+          {selectedProducts.size > 0 && (
+            <button
+              onClick={openBulkDeleteModal}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Excluir ({selectedProducts.size})
+            </button>
+          )}
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Produto
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -285,9 +394,23 @@ const ProductsManager: React.FC = () => {
       {/* Products Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px]">
+          <table className="w-full min-w-[750px]">
             <thead className="bg-gray-50">
               <tr>
+                {/* 🔥 NOVO: Coluna de checkbox */}
+                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 w-12">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="hover:bg-gray-200 rounded p-0.5 transition-colors"
+                    title={selectAll ? 'Desmarcar todos' : 'Selecionar todos'}
+                  >
+                    {selectAll ? (
+                      <CheckSquare className="w-4 h-4 text-primary-600" />
+                    ) : (
+                      <Square className="w-4 h-4 text-gray-400" />
+                    )}
+                  </button>
+                </th>
                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">Produto</th>
                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 hidden sm:table-cell">Categoria</th>
                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 hidden md:table-cell">Marca</th>
@@ -300,15 +423,30 @@ const ProductsManager: React.FC = () => {
             <tbody>
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-gray-500">
+                  <td colSpan={8} className="text-center py-8 text-gray-500">
                     Nenhum produto encontrado
                   </td>
                 </tr>
               ) : (
                 filteredProducts.map(product => {
                   const isOutOfStock = product.stock === 0;
+                  const isSelected = selectedProducts.has(product.id);
                   return (
-                    <tr key={product.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${isOutOfStock ? 'bg-yellow-50/30' : ''}`}>
+                    <tr key={product.id} className={`border-b border-gray-100 transition-colors ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'} ${isOutOfStock ? 'bg-yellow-50/30' : ''}`}>
+                      {/* 🔥 NOVO: Checkbox de seleção */}
+                      <td className="py-3 px-3 sm:px-4">
+                        <button
+                          onClick={() => toggleProductSelection(product.id)}
+                          className="hover:bg-gray-200 rounded p-0.5 transition-colors"
+                          title={isSelected ? 'Desmarcar' : 'Selecionar'}
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-primary-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+                      </td>
                       <td className="py-3 px-3 sm:px-4">
                         <div className="flex items-center gap-3">
                           <img
@@ -382,9 +520,36 @@ const ProductsManager: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* 🔥 NOVO: Barra de status da seleção */}
+        {selectedProducts.size > 0 && (
+          <div className="bg-primary-50 border-t border-primary-200 px-4 py-3 flex items-center justify-between">
+            <p className="text-sm text-primary-700">
+              <strong>{selectedProducts.size}</strong> produto{selectedProducts.size > 1 ? 's' : ''} selecionado{selectedProducts.size > 1 ? 's' : ''}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setSelectedProducts(new Set());
+                  setSelectAll(false);
+                }}
+                className="text-sm text-gray-600 hover:text-gray-800 underline"
+              >
+                Limpar seleção
+              </button>
+              <button
+                onClick={openBulkDeleteModal}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Excluir selecionados
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Modais - mantidos iguais */}
+      {/* Modal de Criar/Editar Produto */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={handleCloseModal} />
@@ -494,6 +659,7 @@ const ProductsManager: React.FC = () => {
         </div>
       )}
 
+      {/* Modal de Exclusão Individual */}
       {showDeleteModal && productToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={handleCloseDeleteModal} />
@@ -519,6 +685,51 @@ const ProductsManager: React.FC = () => {
                     <>
                       <Trash2 className="w-4 h-4" />
                       Excluir
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔥 NOVO: Modal de Exclusão em Massa */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowBulkDeleteModal(false)} />
+          <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl animate-[modalSlideUp_0.3s_ease]">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4">
+                <AlertTriangle className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Excluir Produtos</h3>
+              <p className="text-gray-600">
+                Tem certeza que deseja excluir <strong>{selectedProducts.size}</strong> produto{selectedProducts.size > 1 ? 's' : ''} selecionado{selectedProducts.size > 1 ? 's' : ''}?
+              </p>
+              <p className="text-sm text-red-500 mt-1">Esta ação não pode ser desfeita.</p>
+              <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                <button
+                  onClick={() => setShowBulkDeleteModal(false)}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={executeBulkDelete}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {deleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      Excluindo...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Excluir {selectedProducts.size} produto{selectedProducts.size > 1 ? 's' : ''}
                     </>
                   )}
                 </button>
