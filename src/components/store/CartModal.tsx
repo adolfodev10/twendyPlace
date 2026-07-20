@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { X, ShoppingCart, Trash2, Minus, Plus, CreditCard, Upload, File, Check, AlertCircle } from 'lucide-react';
+import { X, ShoppingCart, Trash2, Minus, Plus, CreditCard, Upload, File, Check, AlertCircle, MapPin, Phone, Mail, Building, Copy } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { cartService } from '../../services/cartService';
@@ -24,6 +24,13 @@ const ConfirmModal: React.FC<{
   uploadProgress: number;
   isUploading: boolean;
   uploadedFileURL: string | null;
+  userData: {
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+  } | null;
 }> = ({
   isOpen,
   onClose,
@@ -35,26 +42,116 @@ const ConfirmModal: React.FC<{
   uploadedFile,
   uploadProgress,
   isUploading,
-  uploadedFileURL
+  uploadedFileURL,
+  userData
 }) => {
     if (!isOpen) return null;
 
+
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // IBAN fictício da empresa
+    const COMPANY_IBAN = 'AO06.0040.0000.1234.5678.9012.3';
+    const COMPANY_NAME = 'Twendy Create LDA.';
+
+    const copyToClipboard = (text: string) => {
+      navigator.clipboard.writeText(text).then(() => {
+        toast.success('IBAN copiado para a área de transferência!');
+      }).catch(() => {
+        toast.error('Erro ao copiar IBAN');
+      });
+    };
 
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center">
         <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-        <div className="relative bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl animate-[modalSlideUp_0.3s_ease] max-h-[90vh] overflow-y-auto">
+        <div className="relative bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 shadow-2xl animate-[modalSlideUp_0.3s_ease] max-h-[90vh] overflow-y-auto">
           <div className="text-center">
             <div className="w-20 h-20 mx-auto bg-blue-50 rounded-full flex items-center justify-center mb-4">
               <CreditCard className="w-10 h-10 text-primary-600" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Confirmar Pedido</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Finalizar Pedido</h3>
             <p className="text-gray-500 mb-6">
               Confirme seu pedido de <strong className="text-primary-600">Kz {total.toFixed(2)}</strong>
             </p>
 
+            {/* Grid de informações */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {/* Dados do Cliente */}
+              <div className="bg-blue-50 rounded-xl p-4 text-left">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Building className="w-4 h-4 text-blue-600" />
+                  Seus Dados
+                </h4>
+                {userData && (
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-gray-500">Morada</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {userData.address || userData.city || 'Não informado'}, {userData.city || ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-gray-500">Telefone</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {userData.phone || 'Não informado'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs text-gray-500">Email</p>
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {userData.email || 'Não informado'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {!userData && (
+                  <p className="text-sm text-gray-500">Dados não disponíveis</p>
+                )}
+              </div>
+
+              {/* Dados de Pagamento */}
+              <div className="bg-green-50 rounded-xl p-4 text-left">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-green-600" />
+                  Pagamento por Multicaixa
+                </h4>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Titular</p>
+                    <p className="text-sm font-medium text-gray-900">{COMPANY_NAME}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">IBAN</p>
+                    <div className="flex items-center gap-2 bg-white rounded-lg p-2 mt-1 border border-gray-200">
+                      <p className="text-sm font-mono font-bold text-gray-900 flex-1 select-all">
+                        {COMPANY_IBAN}
+                      </p>
+                      <button
+                        onClick={() => copyToClipboard(COMPANY_IBAN)}
+                        className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="Copiar IBAN"
+                      >
+                        <Copy className="w-4 h-4 text-gray-500 hover:text-primary-600" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Resumo do Pedido */}
             <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left max-h-40 overflow-y-auto">
+              <h4 className="font-semibold text-gray-900 mb-2">Resumo do Pedido</h4>
               {items.map((item, index) => (
                 <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
                   <span className="text-sm text-gray-700">{item.name}</span>
@@ -67,6 +164,23 @@ const ConfirmModal: React.FC<{
                 <span className="font-bold text-gray-900">Total</span>
                 <span className="font-bold text-primary-600 text-lg">Kz {total.toFixed(2)}</span>
               </div>
+            </div>
+
+            {/* Instruções de Pagamento */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 text-left">
+              <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-yellow-600" />
+                Instruções
+              </h4>
+              <ol className="text-sm text-gray-700 space-y-1 list-decimal list-inside">
+                <li>Realize a transferência para o IBAN acima</li>
+                <li>Tire um print ou foto do comprovativo</li>
+                <li>Faça o upload do comprovativo abaixo</li>
+                <li>Confirme o pedido após o upload</li>
+              </ol>
+              <p className="text-xs text-gray-500 mt-2">
+                Seu pedido será processado após a confirmação do pagamento
+              </p>
             </div>
 
             {/* Upload de Comprovativo */}
@@ -191,6 +305,15 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
+  // Preparar dados do usuário para o modal de confirmação
+  const userData = user ? {
+    name: user.name || 'Cliente',
+    email: user.email || '',
+    phone: user.phone || '',
+    address: user.address || '',
+    city: user.city || '',
+  } : null;
+
   // 🔥 VALIDAÇÃO DE ESTOQUE AO ATUALIZAR QUANTIDADE
   const handleUpdateQuantity = (productId: string, newQty: number) => {
     const item = items.find(i => i.id === productId);
@@ -246,53 +369,53 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
   };
 
   // 🔥 HANDLE UPLOAD DE COMPROVATIVO - CORRIGIDO
-const handleFileUpload = async (file: File) => {
-  // Validar tamanho (5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    toast.error('Arquivo muito grande. Máximo 5MB.');
-    return;
-  }
+  const handleFileUpload = async (file: File) => {
+    // Validar tamanho (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Arquivo muito grande. Máximo 5MB.');
+      return;
+    }
 
-  // Validar tipo
-  const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-  if (!validTypes.includes(file.type)) {
-    toast.error('Formato inválido. Use PNG, JPG ou PDF.');
-    return;
-  }
+    // Validar tipo
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Formato inválido. Use PNG, JPG ou PDF.');
+      return;
+    }
 
-  setUploadedFile(file);
-  setIsUploading(true);
-  setUploadProgress(0);
+    setUploadedFile(file);
+    setIsUploading(true);
+    setUploadProgress(0);
 
-  try {
-    // 🔥 CORRIGIDO: Usar FormData corretamente
-    const formData = new FormData();
-    formData.append('image', file);
+    try {
+      // 🔥 CORRIGIDO: Usar FormData corretamente
+      const formData = new FormData();
+      formData.append('image', file);
 
-    // 🔥 CORRIGIDO: Usar fetch (mais simples e confiável)
-    const response = await fetch('https://api.imgbb.com/1/upload?key=4e470b576522a10c52b87edf23905cb3', {
-      method: 'POST',
-      body: formData,
-    });
+      // 🔥 CORRIGIDO: Usar fetch (mais simples e confiável)
+      const response = await fetch('https://api.imgbb.com/1/upload?key=4e470b576522a10c52b87edf23905cb3', {
+        method: 'POST',
+        body: formData,
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (data.success) {
-      setUploadedFileURL(data.data.url);
-      setUploadProgress(100);
-      toast.success('Comprovativo enviado com sucesso!');
-    } else {
+      if (data.success) {
+        setUploadedFileURL(data.data.url);
+        setUploadProgress(100);
+        toast.success('Comprovativo enviado com sucesso!');
+      } else {
+        toast.error('Erro ao enviar comprovativo. Tente novamente.');
+        setUploadedFile(null);
+      }
+    } catch (error) {
+      console.error('Erro no upload:', error);
       toast.error('Erro ao enviar comprovativo. Tente novamente.');
       setUploadedFile(null);
+    } finally {
+      setIsUploading(false);
     }
-  } catch (error) {
-    console.error('Erro no upload:', error);
-    toast.error('Erro ao enviar comprovativo. Tente novamente.');
-    setUploadedFile(null);
-  } finally {
-    setIsUploading(false);
-  }
-};
+  };
 
   // 🔥 HANDLE CONFIRMAR PEDIDO
   const handleConfirmOrder = async () => {
@@ -502,6 +625,7 @@ const handleFileUpload = async (file: File) => {
         uploadProgress={uploadProgress}
         isUploading={isUploading}
         uploadedFileURL={uploadedFileURL}
+        userData={userData}
       />
     </>
   );
