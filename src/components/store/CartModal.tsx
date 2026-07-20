@@ -49,7 +49,7 @@ const ConfirmModal: React.FC<{
 
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-    
+
     // IBAN fictício da empresa
     const COMPANY_IBAN = 'AO06.0040.0000.1234.5678.9012.3';
     const COMPANY_NAME = 'Twendy Create LDA.';
