@@ -9,7 +9,8 @@ import {
   Menu,
   X,
   FileImage,
-  Users2
+  Users2,
+  UserCircle
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/authService';
@@ -47,6 +48,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { path: '/admin/orders', icon: ShoppingCart, label: 'Pedidos' },
     { path: '/admin/products', icon: Package, label: 'Produtos' },
     { path: '/admin/clients', icon: Users, label: 'Clientes' },
+    { path: '/admin/users', icon: UserCircle, label: 'Usuários' },
     { path: '/admin/proofPayment', icon: FileImage, label: 'Comprovativos' },
     { path: '/admin/partners', icon: Users2, label: 'Parceiros' }
   ];
