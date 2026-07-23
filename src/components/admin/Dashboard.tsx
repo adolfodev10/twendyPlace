@@ -30,6 +30,26 @@ import {
   Legend,
 } from 'recharts';
 
+const STATUS_LABELS: Record<string, string> = {
+  awaiting_payment: 'Aguardando',
+  paid: 'Pago',
+  processing: 'Processando',
+  shipped: 'Enviado',
+  delivered: 'Entregue',
+  cancelled: 'Cancelado',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  awaiting_payment: 'bg-yellow-100 text-yellow-700',
+  paid: 'bg-blue-100 text-blue-700',
+  processing: 'bg-purple-100 text-purple-700',
+  shipped: 'bg-cyan-100 text-cyan-700',
+  delivered: 'bg-green-100 text-green-700',
+  cancelled: 'bg-red-100 text-red-700',
+};
+
+const COLORS = ['#3b82f6', '#f59e0b', '#8b5cf6', '#10b981', '#ef4444', '#06b6d4'];
+
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState({
     totalOrders: 0,
@@ -180,14 +200,13 @@ const Dashboard: React.FC = () => {
     });
 
     const statusData = Object.entries(statusCount).map(([name, value]) => ({
-      name: statusLabels[name] || name,
+      name: STATUS_LABELS[name] || name,
       value,
     }));
 
     return { salesByDay, statusData };
   }, [stats.allOrders]);
 
-  const COLORS = ['#3b82f6', '#f59e0b', '#8b5cf6', '#10b981', '#ef4444', '#06b6d4'];
 
   const statCards = [
     { label: 'Total de Pedidos', value: stats.totalOrders, icon: ShoppingCart, color: 'bg-blue-500' },
@@ -197,23 +216,6 @@ const Dashboard: React.FC = () => {
     { label: 'Faturamento', value: `Kz ${stats.totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'bg-emerald-500' },
   ];
 
-  const statusColors: Record<string, string> = {
-    awaiting_payment: 'bg-yellow-100 text-yellow-700',
-    paid: 'bg-blue-100 text-blue-700',
-    processing: 'bg-purple-100 text-purple-700',
-    shipped: 'bg-cyan-100 text-cyan-700',
-    delivered: 'bg-green-100 text-green-700',
-    cancelled: 'bg-red-100 text-red-700',
-  };
-
-  const statusLabels: Record<string, string> = {
-    awaiting_payment: 'Aguardando',
-    paid: 'Pago',
-    processing: 'Processando',
-    shipped: 'Enviado',
-    delivered: 'Entregue',
-    cancelled: 'Cancelado',
-  };
 
   if (loading) {
     return (
@@ -378,8 +380,8 @@ const Dashboard: React.FC = () => {
                 <div key={order.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-sm transition-shadow">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-semibold text-gray-900 text-sm">#{order.orderNumber || order.id?.slice(-6)}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[order.status] || 'bg-gray-100 text-gray-700'}`}>
-                      {statusLabels[order.status] || order.status}
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-700'}`}>
+                      {STATUS_LABELS[order.status] || order.status}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-500">
@@ -428,8 +430,8 @@ const Dashboard: React.FC = () => {
                       <td className="py-3 px-4 text-sm text-gray-600 truncate max-w-[150px]">{order.customer?.name || 'Cliente'}</td>
                       <td className="py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Kz {order.total?.toFixed(2) || '0.00'}</td>
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[order.status] || 'bg-gray-100 text-gray-700'} whitespace-nowrap`}>
-                          {statusLabels[order.status] || order.status}
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-700'} whitespace-nowrap`}>
+                          {STATUS_LABELS[order.status] || order.status}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-500 whitespace-nowrap">{formattedDate}</td>
