@@ -142,7 +142,6 @@ const UsersManager: React.FC = () => {
         avatar: formData.avatar ? sanitizeInput(formData.avatar) : undefined,
       };
 
-      console.log("User: ", userData);
 
       // Só envia senha se for criação OU redefinição de senha
       if (!editingUser && formData.password) {
