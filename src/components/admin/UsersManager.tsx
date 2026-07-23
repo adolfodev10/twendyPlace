@@ -318,7 +318,7 @@ const UsersManager: React.FC = () => {
   }
 
   return (
-    <div className="-mt-32">
+    <div className="lg:-mt-32">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
           <Users className="w-6 h-6 text-primary-600" />

@@ -309,7 +309,7 @@ const ProductsManager: React.FC = () => {
   }
 
   return (
-    <div className="px-2 sm:px-0 -mt-32">
+    <div className="px-2 sm:px-0 lg:-mt-32">
       {/* Banner de Produtos Esgotados */}
       {outOfStockCount > 0 && (
         <div className="mb-4 p-3 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-center justify-between flex-wrap gap-2 sm:gap-3">
