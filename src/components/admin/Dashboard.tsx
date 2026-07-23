@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Order } from '../../types';
@@ -10,9 +10,25 @@ import {
   TrendingUp,
   Clock,
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  BarChart3,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from 'recharts';
 
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState({
@@ -22,17 +38,15 @@ const Dashboard: React.FC = () => {
     totalClients: 0,
     totalRevenue: 0,
     recentOrders: [] as Order[],
+    allOrders: [] as Order[],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 🔥 FUNÇÃO CORRIGIDA - com verificações de segurança
   const formatDate = (value: unknown): string => {
     if (!value) return '--';
-
     try {
       let date: Date | null = null;
-
       if (typeof (value as any)?.toDate === 'function') {
         date = (value as any).toDate();
       } else if (value instanceof Date) {
@@ -41,24 +55,17 @@ const Dashboard: React.FC = () => {
         date = new Date((value as any).seconds * 1000);
       } else if (typeof value === 'string' || typeof value === 'number') {
         const parsed = new Date(value);
-        if (!isNaN(parsed.getTime())) {
-          date = parsed;
-        }
+        if (!isNaN(parsed.getTime())) date = parsed;
       }
-
-      if (!date || isNaN(date.getTime())) {
-        return '--';
-      }
-
+      if (!date || isNaN(date.getTime())) return '--';
       return date.toLocaleDateString('pt-BR', {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
       });
-    } catch (error) {
-      console.error('Erro ao formatar data:', error);
+    } catch {
       return '--';
     }
   };
@@ -67,22 +74,15 @@ const Dashboard: React.FC = () => {
     const loadStats = async () => {
       setLoading(true);
       setError(null);
-
       try {
         const ordersSnap = await getDocs(collection(db, 'orders'));
         const orders = ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
         const pendingOrders = orders.filter(o => o.status === 'awaiting_payment');
-
-        const totalRevenue = orders
-          .filter(o => o.status !== 'cancelled')
-          .reduce((sum, o) => sum + (o.total || 0), 0);
-
+        const totalRevenue = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + (o.total || 0), 0);
         const productsSnap = await getDocs(collection(db, 'products'));
         const totalProducts = productsSnap.size;
-
         const clientsSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'customer')));
         const totalClients = clientsSnap.size;
-
         const recentOrders = [...orders]
           .sort((a, b) => {
             const getTime = (val: any): number => {
@@ -93,9 +93,7 @@ const Dashboard: React.FC = () => {
               if (typeof val === 'object' && val?.seconds) return val.seconds * 1000;
               return 0;
             };
-            const dateA = getTime(a.createdAt);
-            const dateB = getTime(b.createdAt);
-            return dateB - dateA;
+            return getTime(b.createdAt) - getTime(a.createdAt);
           })
           .slice(0, 5);
 
@@ -106,6 +104,7 @@ const Dashboard: React.FC = () => {
           totalClients,
           totalRevenue,
           recentOrders,
+          allOrders: orders,
         });
       } catch (error) {
         console.error('Erro ao carregar estatísticas:', error);
@@ -114,51 +113,68 @@ const Dashboard: React.FC = () => {
         setLoading(false);
       }
     };
-
     loadStats();
   }, []);
 
+  // 📊 DADOS PARA GRÁFICOS
+  const chartData = useMemo(() => {
+    // Vendas dos últimos 7 dias
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - i));
+      date.setHours(0, 0, 0, 0);
+      return date;
+    });
+
+    const salesByDay = last7Days.map(day => {
+      const dayOrders = stats.allOrders.filter(o => {
+        const orderDate = o.createdAt
+          ? (typeof (o.createdAt as any)?.toDate === 'function'
+              ? (o.createdAt as any).toDate()
+              : o.createdAt instanceof Date
+                ? o.createdAt
+                : o.createdAt?.seconds
+                  ? new Date(o.createdAt.seconds * 1000)
+                  : new Date(o.createdAt))
+          : null;
+        if (!orderDate) return false;
+        return (
+          orderDate.getDate() === day.getDate() &&
+          orderDate.getMonth() === day.getMonth() &&
+          orderDate.getFullYear() === day.getFullYear()
+        );
+      });
+
+      return {
+        dia: day.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+        vendas: dayOrders.filter(o => o.status !== 'cancelled').length,
+        faturamento: dayOrders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + (o.total || 0), 0),
+      };
+    });
+
+    // Status dos pedidos
+    const statusCount: Record<string, number> = {};
+    stats.allOrders.forEach(o => {
+      const status = o.status || 'unknown';
+      statusCount[status] = (statusCount[status] || 0) + 1;
+    });
+
+    const statusData = Object.entries(statusCount).map(([name, value]) => ({
+      name: statusLabels[name] || name,
+      value,
+    }));
+
+    return { salesByDay, statusData };
+  }, [stats.allOrders]);
+
+  const COLORS = ['#3b82f6', '#f59e0b', '#8b5cf6', '#10b981', '#ef4444', '#06b6d4'];
+
   const statCards = [
-    {
-      label: 'Total de Pedidos',
-      value: stats.totalOrders,
-      icon: ShoppingCart,
-      color: 'bg-blue-500',
-      textColor: 'text-blue-600',
-      bgLight: 'bg-blue-50'
-    },
-    {
-      label: 'Pendentes',
-      value: stats.pendingOrders,
-      icon: Clock,
-      color: 'bg-yellow-500',
-      textColor: 'text-yellow-600',
-      bgLight: 'bg-yellow-50'
-    },
-    {
-      label: 'Produtos',
-      value: stats.totalProducts,
-      icon: Package,
-      color: 'bg-green-500',
-      textColor: 'text-green-600',
-      bgLight: 'bg-green-50'
-    },
-    {
-      label: 'Clientes',
-      value: stats.totalClients,
-      icon: Users,
-      color: 'bg-purple-500',
-      textColor: 'text-purple-600',
-      bgLight: 'bg-purple-50'
-    },
-    {
-      label: 'Faturamento',
-      value: `Kz ${stats.totalRevenue.toFixed(2)}`,
-      icon: DollarSign,
-      color: 'bg-emerald-500',
-      textColor: 'text-emerald-600',
-      bgLight: 'bg-emerald-50'
-    },
+    { label: 'Total de Pedidos', value: stats.totalOrders, icon: ShoppingCart, color: 'bg-blue-500' },
+    { label: 'Pendentes', value: stats.pendingOrders, icon: Clock, color: 'bg-yellow-500' },
+    { label: 'Produtos', value: stats.totalProducts, icon: Package, color: 'bg-green-500' },
+    { label: 'Clientes', value: stats.totalClients, icon: Users, color: 'bg-purple-500' },
+    { label: 'Faturamento', value: `Kz ${stats.totalRevenue.toFixed(2)}`, icon: DollarSign, color: 'bg-emerald-500' },
   ];
 
   const statusColors: Record<string, string> = {
@@ -181,22 +197,19 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-48 sm:h-64 md:h-96">
-        <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-primary-600"></div>
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col  items-center justify-center h-48 sm:h-64 md:h-96 text-center px-4">
-        <AlertCircle className="w-12 h-12 sm:w-16 sm:h-16 text-red-400 mb-3 sm:mb-4" />
-        <h3 className="text-base sm:text-lg font-semibold text-gray-900">Erro ao carregar</h3>
-        <p className="text-sm sm:text-base text-gray-500 mt-1 sm:mt-2">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-4 px-4 sm:px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm sm:text-base"
-        >
+      <div className="flex flex-col items-center justify-center h-96 text-center px-4">
+        <AlertCircle className="w-16 h-16 text-red-400 mb-4" />
+        <h3 className="text-lg font-semibold text-gray-900">Erro ao carregar</h3>
+        <p className="text-base text-gray-500 mt-2">{error}</p>
+        <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
           Tentar novamente
         </button>
       </div>
@@ -204,40 +217,137 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="w-full px-2 -mt-28 sm:px-0">
-      <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Dashboard</h1>
+    <div className="w-full px-2 sm:px-0">
+      <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
 
-      {/* Stats Grid - Responsivo */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-4 mb-6 sm:mb-8">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
         {statCards.map((stat, index) => (
-          <div
-            key={index}
-            className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 md:p-5 hover:shadow-md transition-all hover:-translate-y-0.5"
-          >
+          <div key={index} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-all hover:-translate-y-0.5">
             <div className="flex items-center justify-between">
-              <div className={`${stat.color} p-2 sm:p-2.5 md:p-3 rounded-lg`}>
-                <stat.icon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+              <div className={`${stat.color} p-2.5 rounded-lg`}>
+                <stat.icon className="w-5 h-5 text-white" />
               </div>
-              <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500 hidden xs:block" />
+              <TrendingUp className="w-4 h-4 text-green-500 hidden xs:block" />
             </div>
-            <p className="text-base sm:text-xl md:text-2xl font-bold text-gray-900 mt-2 sm:mt-3 truncate">
-              {stat.value}
-            </p>
-            <p className="text-[10px] sm:text-xs md:text-sm text-gray-500 truncate">{stat.label}</p>
+            <p className="text-xl md:text-2xl font-bold text-gray-900 mt-3 truncate">{stat.value}</p>
+            <p className="text-xs text-gray-500 truncate">{stat.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Recent Orders - Versão Mobile (Card View) */}
+      {/* 📊 GRÁFICOS */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
+        {/* Gráfico de Linha - Vendas 7 dias */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+          <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-blue-500" />
+            Vendas - Últimos 7 Dias
+          </h2>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={chartData.salesByDay}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="dia" fontSize={11} />
+              <YAxis fontSize={11} />
+              <Tooltip />
+              <Line type="monotone" dataKey="vendas" stroke="#3b82f6" strokeWidth={3} dot={{ fill: '#3b82f6', r: 4 }} activeDot={{ r: 6 }} name="Vendas" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Gráfico de Barras - Faturamento 7 dias */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+          <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-emerald-500" />
+            Faturamento - Últimos 7 Dias
+          </h2>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={chartData.salesByDay}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="dia" fontSize={11} />
+              <YAxis fontSize={11} />
+              <Tooltip formatter={(value: number) => `Kz ${value.toFixed(2)}`} />
+              <Bar dataKey="faturamento" fill="#10b981" radius={[6, 6, 0, 0]} name="Faturamento" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Gráfico de Pizza - Status dos Pedidos */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+          <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <ShoppingCart className="w-5 h-5 text-violet-500" />
+            Status dos Pedidos
+          </h2>
+          {chartData.statusData.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 text-sm">Sem dados</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie data={chartData.statusData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} dataKey="value">
+                  {chartData.statusData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Gráfico de Barras Horizontais - Top Produtos (placeholder) */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+          <h2 className="text-sm md:text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Package className="w-5 h-5 text-orange-500" />
+            Resumo Rápido
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-gray-600">Taxa de aprovação</span>
+                <span className="font-semibold text-green-600">
+                  {stats.totalOrders > 0 ? Math.round(((stats.totalOrders - (stats.allOrders?.filter(o => o.status === 'cancelled').length || 0)) / stats.totalOrders) * 100) : 0}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="bg-green-500 h-2 rounded-full" style={{ width: `${stats.totalOrders > 0 ? Math.round(((stats.totalOrders - (stats.allOrders?.filter(o => o.status === 'cancelled').length || 0)) / stats.totalOrders) * 100) : 0}%` }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-gray-600">Pedidos pendentes</span>
+                <span className="font-semibold text-yellow-600">
+                  {stats.totalOrders > 0 ? Math.round((stats.pendingOrders / stats.totalOrders) * 100) : 0}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${stats.totalOrders > 0 ? Math.round((stats.pendingOrders / stats.totalOrders) * 100) : 0}%` }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-gray-600">Ticket médio</span>
+                <span className="font-semibold text-blue-600">
+                  Kz {stats.totalOrders > 0 ? (stats.totalRevenue / stats.totalOrders).toFixed(2) : '0.00'}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${Math.min(100, stats.totalOrders > 0 ? ((stats.totalRevenue / stats.totalOrders) / 10000) * 100 : 0)}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Orders - Mobile (Card View) */}
       <div className="block lg:hidden mb-6">
-        <h2 className="text-sm sm:text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
+        <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <Clock className="w-5 h-5 text-primary-600" />
           Últimos Pedidos
         </h2>
-
         {stats.recentOrders.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 text-center py-8 text-gray-500">
-            <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-gray-300 mb-2" />
+            <Package className="w-12 h-12 mx-auto text-gray-300 mb-2" />
             <p className="text-sm">Nenhum pedido encontrado</p>
           </div>
         ) : (
@@ -245,20 +355,18 @@ const Dashboard: React.FC = () => {
             {stats.recentOrders.map((order) => {
               const formattedDate = formatDate(order.createdAt);
               return (
-                <div key={order.id} className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 hover:shadow-sm transition-shadow">
+                <div key={order.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-sm transition-shadow">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-gray-900 text-xs sm:text-sm">
-                      #{order.orderNumber || order.id?.slice(-6)}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium ${statusColors[order.status] || 'bg-gray-100 text-gray-700'}`}>
+                    <span className="font-semibold text-gray-900 text-sm">#{order.orderNumber || order.id?.slice(-6)}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[order.status] || 'bg-gray-100 text-gray-700'}`}>
                       {statusLabels[order.status] || order.status}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-[10px] sm:text-xs text-gray-500">
+                  <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>{order.customer?.name || 'Cliente'}</span>
-                    <span className="font-semibold text-gray-900 text-xs sm:text-sm">Kz {order.total?.toFixed(2) || '0.00'}</span>
+                    <span className="font-semibold text-gray-900 text-sm">Kz {order.total?.toFixed(2) || '0.00'}</span>
                   </div>
-                  <div className="mt-1 text-[9px] sm:text-[10px] text-gray-400">{formattedDate}</div>
+                  <div className="mt-1 text-[10px] text-gray-400">{formattedDate}</div>
                 </div>
               );
             })}
@@ -266,13 +374,12 @@ const Dashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Recent Orders - Versão Desktop (Table View) */}
-      <div className="hidden lg:block bg-white rounded-xl border border-gray-200 p-4 md:p-6">
-        <h2 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-          <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
+      {/* Recent Orders - Desktop (Table View) */}
+      <div className="hidden lg:block bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <Clock className="w-5 h-5 text-primary-600" />
           Últimos Pedidos
         </h2>
-
         {stats.recentOrders.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Package className="w-12 h-12 mx-auto text-gray-300 mb-3" />
@@ -283,11 +390,11 @@ const Dashboard: React.FC = () => {
             <table className="w-full min-w-[600px]">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-xs md:text-sm font-medium text-gray-500">Pedido</th>
-                  <th className="text-left py-3 px-4 text-xs md:text-sm font-medium text-gray-500">Cliente</th>
-                  <th className="text-left py-3 px-4 text-xs md:text-sm font-medium text-gray-500">Total</th>
-                  <th className="text-left py-3 px-4 text-xs md:text-sm font-medium text-gray-500">Status</th>
-                  <th className="text-left py-3 px-4 text-xs md:text-sm font-medium text-gray-500">Data</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Pedido</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Cliente</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Total</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Status</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Data</th>
                 </tr>
               </thead>
               <tbody>
@@ -296,24 +403,16 @@ const Dashboard: React.FC = () => {
                   return (
                     <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                       <td className="py-3 px-4">
-                        <span className="font-medium text-gray-900 text-sm">
-                          #{order.orderNumber || order.id?.slice(-6)}
-                        </span>
+                        <span className="font-medium text-gray-900 text-sm">#{order.orderNumber || order.id?.slice(-6)}</span>
                       </td>
-                      <td className="py-3 px-4 text-sm text-gray-600 truncate max-w-[150px]">
-                        {order.customer?.name || 'Cliente'}
-                      </td>
-                      <td className="py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">
-                        Kz {order.total?.toFixed(2) || '0.00'}
-                      </td>
+                      <td className="py-3 px-4 text-sm text-gray-600 truncate max-w-[150px]">{order.customer?.name || 'Cliente'}</td>
+                      <td className="py-3 px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">Kz {order.total?.toFixed(2) || '0.00'}</td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[order.status] || 'bg-gray-100 text-gray-700'} whitespace-nowrap`}>
                           {statusLabels[order.status] || order.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-sm text-gray-500 whitespace-nowrap">
-                        {formattedDate}
-                      </td>
+                      <td className="py-3 px-4 text-sm text-gray-500 whitespace-nowrap">{formattedDate}</td>
                     </tr>
                   );
                 })}
@@ -321,26 +420,19 @@ const Dashboard: React.FC = () => {
             </table>
           </div>
         )}
-
         <div className="mt-4 pt-4 border-t border-gray-100 text-right">
-          <Link
-            to="/admin/orders"
-            className="inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
-          >
+          <Link to="/admin/orders" className="inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors">
             Ver todos os pedidos
             <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
       </div>
 
-      {/* Link para pedidos no mobile */}
+      {/* Link mobile */}
       <div className="block lg:hidden text-center mt-2">
-        <Link
-          to="/admin/orders"
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
-        >
+        <Link to="/admin/orders" className="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors">
           Ver todos os pedidos
-          <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <ChevronRight className="w-4 h-4" />
         </Link>
       </div>
     </div>
