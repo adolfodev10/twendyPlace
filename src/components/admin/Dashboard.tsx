@@ -118,6 +118,34 @@ const Dashboard: React.FC = () => {
 
   // 📊 DADOS PARA GRÁFICOS
   const chartData = useMemo(() => {
+    const getDateFromValue = (value: unknown): Date | null => {
+      if (!value) return null;
+
+      if (typeof (value as any)?.toDate === 'function') {
+        return (value as any).toDate();
+      }
+
+      if (value instanceof Date) {
+        return value;
+      }
+
+      if (typeof value === 'object' && value !== null && 'seconds' in value) {
+        const seconds = (value as { seconds?: number }).seconds;
+        if (typeof seconds === 'number') {
+          return new Date(seconds * 1000);
+        }
+      }
+
+      if (typeof value === 'string' || typeof value === 'number') {
+        const parsed = new Date(value);
+        if (!isNaN(parsed.getTime())) {
+          return parsed;
+        }
+      }
+
+      return null;
+    };
+
     // Vendas dos últimos 7 dias
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = new Date();
@@ -128,15 +156,7 @@ const Dashboard: React.FC = () => {
 
     const salesByDay = last7Days.map(day => {
       const dayOrders = stats.allOrders.filter(o => {
-        const orderDate = o.createdAt
-          ? (typeof (o.createdAt as any)?.toDate === 'function'
-              ? (o.createdAt as any).toDate()
-              : o.createdAt instanceof Date
-                ? o.createdAt
-                : o.createdAt?.seconds
-                  ? new Date(o.createdAt.seconds * 1000)
-                  : new Date(o.createdAt))
-          : null;
+        const orderDate = getDateFromValue(o.createdAt);
         if (!orderDate) return false;
         return (
           orderDate.getDate() === day.getDate() &&
@@ -217,7 +237,7 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="w-full px-2 sm:px-0">
+    <div className="w-full -mt-28 px-2 sm:px-0">
       <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
 
       {/* Stats Grid */}
