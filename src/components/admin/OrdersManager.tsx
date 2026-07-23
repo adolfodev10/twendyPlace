@@ -678,7 +678,7 @@ const OrdersManager: React.FC = () => {
     }
 
     return (
-        <div className="-mt-28">
+        <div className="-mt-32">
             {/* Modal de Confirmação para Status */}
             <ConfirmModal
                 isOpen={confirmModal.isOpen}

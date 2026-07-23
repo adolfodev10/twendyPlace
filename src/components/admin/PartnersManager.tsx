@@ -685,7 +685,7 @@ const PartnersManager: React.FC = () => {
             )}
 
             {/* Header */}
-            <div className="flex -mt-28 flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <div className="flex -mt-32 flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                         <Users className="w-6 h-6 text-primary-600" />

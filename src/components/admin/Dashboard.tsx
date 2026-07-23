@@ -237,7 +237,7 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="w-full -mt-28 px-2 sm:px-0">
+    <div className="w-full -mt-32 px-2 sm:px-0">
       <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
 
       {/* Stats Grid */}
