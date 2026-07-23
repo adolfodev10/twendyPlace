@@ -1,5 +1,5 @@
 export interface User {
-  id?:string;
+  id?: string;
   uid: string;
   name: string;
   email: string;
@@ -7,6 +7,7 @@ export interface User {
   address?: string;
   city?: string;
   postalCode?: string;
+  user_status?: string;
   avatar?: string;
   role: 'admin' | 'customer';
   createdAt?: Date;
@@ -108,7 +109,7 @@ export interface Order {
   total: number;
   status: 'awaiting_payment' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   paymentMethod: string;
-  paymentProof:string;
+  paymentProof: string;
   customer?: {
     name: string;
     email: string;

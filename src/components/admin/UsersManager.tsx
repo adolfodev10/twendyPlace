@@ -90,7 +90,7 @@ const UsersManager: React.FC = () => {
       setFormData({
         name: '',
         email: '',
-        role: 'cliente',
+        role: 'customer',
         avatar: '',
         password: randomPass,
       });
@@ -523,7 +523,7 @@ const UsersManager: React.FC = () => {
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none appearance-none"
                     required
                   >
-                    <option value="cliente">Cliente</option>
+                    <option value="customer">Cliente</option>
                     <option value="admin">Administrador</option>
                   </select>
                 </div>

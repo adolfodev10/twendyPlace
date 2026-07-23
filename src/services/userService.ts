@@ -30,14 +30,21 @@ export const userService = {
 
       const users = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
         const data = doc.data();
-        const { uid: _uid, id: _id, ...userData } = data as Record<string, any>;
         return {
-          id: doc.id,
-          uid: doc.id,
-          ...userData as Omit<User, 'id' | 'uid'>,
-          name: userData.name || 'Sem nome',
-          email: userData.email || '',
-          role: userData.role || 'customer',
+          uid: data.uid || doc.id,           // Usa uid do campo ou id do documento
+          id: doc.id,                         // id do documento Firestore
+          name: data.name || 'Sem nome',
+          email: data.email || '',
+          role: data.role || 'customer',
+          avatar: data.avatar || '',
+          user_status: data.user_status || 'ACTIVO',
+          phone: data.phone || '',
+          city: data.city || '',
+          address: data.address || '',
+          postalCode: data.postalCode || '',
+          // Converter Timestamp para Date
+          createdAt: data.createdAt?.toDate?.() || data.createdAt || null,
+          updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || null,
         };
       });
 
@@ -54,11 +61,22 @@ export const userService = {
       const snapshot = await getDoc(docRef);
       if (snapshot.exists()) {
         const snapshotData = snapshot.data();
-        const { uid: _uid, id: _id, ...userData } = snapshotData as Record<string, any>;
+        const data = snapshot.data();
+        const { uid: _uid, id: _id } = snapshotData as Record<string, any>;
         return {
-          uid: snapshot.id,
+          uid: data.uid || snapshot.id,
           id: snapshot.id,
-          ...userData as Omit<User, 'id' | 'uid'>,
+          name: data.name || 'Sem nome',
+          email: data.email || '',
+          role: data.role || 'customer',
+          avatar: data.avatar || '',
+          user_status: data.user_status || 'ACTIVO',
+          phone: data.phone || '',
+          city: data.city || '',
+          address: data.address || '',
+          postalCode: data.postalCode || '',
+          createdAt: data.createdAt?.toDate?.() || data.createdAt || null,
+          updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || null,
         };
       }
       return null;
@@ -110,7 +128,7 @@ export const userService = {
       return { success: true, id: uid };
     } catch (error: any) {
       console.error('Erro ao criar usuário:', error);
-      
+
       // Traduzir erros comuns do Firebase Auth
       if (error.code === 'auth/email-already-in-use') {
         return { success: false, error: 'Este email já está registrado' };
@@ -118,7 +136,7 @@ export const userService = {
       if (error.code === 'auth/weak-password') {
         return { success: false, error: 'Senha muito fraca (mínimo 6 caracteres)' };
       }
-      
+
       return { success: false, error: error.message };
     }
   },
@@ -169,14 +187,14 @@ export const userService = {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const user = await this.getUserById(id);
-      
+
       if (!user) {
         return { success: false, error: 'Usuário não encontrado' };
       }
 
       // Enviar email de redefinição de senha (Firebase Auth)
       await sendPasswordResetEmail(auth, user.email);
-      
+
       return { success: true };
     } catch (error: any) {
       console.error('Erro ao redefinir senha:', error);
@@ -263,7 +281,7 @@ export const userService = {
   generateRandomPassword(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
     let password = '';
-    for (let i = 0; i = 16; i++) {
+    for (let i = 0; i < 16; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return password;
