@@ -34,7 +34,7 @@ const UsersManager: React.FC = () => {
   const [formData, setFormData] = useState<UserFormData>({
     name: '',
     email: '',
-    role: 'user',
+    role: 'customer',
     avatar: '',
     password: '',
   });
@@ -80,7 +80,7 @@ const UsersManager: React.FC = () => {
       setFormData({
         name: user.name || '',
         email: user.email || '',
-        role: user.role || 'user',
+        role: user.role || 'customer',
         avatar: user.avatar || '',
         password: '',
       });

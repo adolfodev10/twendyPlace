@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { User } from '../types';
 import cartService from '../services/cartService';
@@ -20,12 +20,113 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
+// ✅ Função auxiliar para buscar usuário por uid (Firebase Auth)
+const findUserByUid = async (uid: string): Promise<User | null> => {
+  // Tentativa 1: Buscar documento com ID = uid
+  const docRef = doc(db, 'users', uid);
+  const docSnap = await getDoc(docRef);
+
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    console.log('📦 Dados brutos do Firestore:', JSON.stringify(data, null, 2)); // Debug
+    console.log("User: ", auth?.currentUser?.displayName);
+
+    return {
+      uid: uid,
+      id: docSnap.id,
+      name: data.name || data.displayName || '',
+      email: data.email || auth.currentUser?.email || '',
+      role: data.role || 'customer',
+      avatar: data.avatar || '',
+      user_status: data.user_status || 'ACTIVO',
+      phone: data.phone || '',
+      city: data.city || '',
+      address: data.address || '',
+      postalCode: data.postalCode || '',
+      createdAt: data.createdAt || null,
+      updatedAt: data.updatedAt || null,
+    };
+  }
+
+  // Tentativa 2: Buscar por campo 'uid'
+  const q = query(collection(db, 'users'), where('uid', '==', uid));
+  const snapshot = await getDocs(q);
+
+  if (!snapshot.empty) {
+    const docData = snapshot.docs[0];
+    const data = docData.data();
+    console.log("Dados: ",data);
+
+    console.log("User: ", auth?.currentUser?.displayName);
+
+    console.log('📦 Dados brutos (query por uid):', JSON.stringify(data, null, 2));
+    return {
+      uid: uid,
+      id: docData.id,
+      name: data.name || data.displayName || 'Sem nome',
+      email: data.email || auth.currentUser?.email || '',
+      role: data.role || 'customer',
+      avatar: data.avatar || '',
+      user_status: data.user_status || 'ACTIVO',
+      phone: data.phone || '',
+      city: data.city || '',
+      address: data.address || '',
+      postalCode: data.postalCode || '',
+      createdAt: data.createdAt || null,
+      updatedAt: data.updatedAt || null,
+    };
+  }
+
+  // Tentativa 3: Buscar por email
+  if (auth.currentUser?.email) {
+    const emailQuery = query(collection(db, 'users'), where('email', '==', auth.currentUser?.email));
+    const emailSnapshot = await getDocs(emailQuery);
+
+    if (!emailSnapshot.empty) {
+      const docData = emailSnapshot.docs[0];
+      const data = docData.data();
+
+      console.log('📦 Dados brutos (query por email):', JSON.stringify(data, null, 2));
+      console.log("User: ", auth.currentUser.displayName);
+
+      return {
+        uid: uid,
+        id: docData.id,
+        name: data.name || data.displayName || 'Sem nome',
+        email: data.email || auth.currentUser.email || '',
+        role: data.role || 'customer',
+        avatar: data.avatar || '',
+        user_status: data.user_status || 'ACTIVO',
+        phone: data.phone || '',
+        city: data.city || '',
+        address: data.address || '',
+        postalCode: data.postalCode || '',
+        createdAt: data.createdAt || null,
+        updatedAt: data.updatedAt || null,
+      };
+    }
+  }
+
+  if (auth.currentUser) {
+    console.log('⚠️ Usuário não encontrado no Firestore, usando dados do Auth');
+    return {
+      uid: uid,
+      id: uid,
+      name: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Usuário',
+      email: auth.currentUser.email || '',
+      role: 'customer',
+      avatar: auth.currentUser.photoURL || '',
+    };
+  }
+
+  return null;
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [previousOrders, setPreviousOrders] = useState<any[]>([]);
 
-  // Compara pedidos anteriores e atuais e retorna mudanças de status
   const getStatusChanges = (prev: any[] = [], curr: any[] = []) => {
     const changes: { orderNumber: string | number; newStatus: any; oldStatus: any; orderId: string }[] = [];
     const prevMap = new Map(prev.map(o => [o.id, o]));
@@ -41,30 +142,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
     }
-
     return changes;
   };
 
   useEffect(() => {
-    if (!auth.onAuthStateChanged) {
-      setLoading(false);
-      return;
-    }
-
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      setLoading(true);
-
       if (firebaseUser) {
         try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data() as Omit<User, 'uid'>;
+          // ✅ Usar a função de busca melhorada
+          const userData = await findUserByUid(firebaseUser.uid);
+
+          if (userData) {
+            setUser(userData);
+          } else {
+            // Criar usuário básico se não encontrado
             setUser({
               uid: firebaseUser.uid,
-              ...userData,
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário',
+              email: firebaseUser.email || '',
+              role: 'customer',
+              avatar: '',
             });
-          } else {
-            setUser(null);
           }
         } catch (error) {
           console.error('Erro ao buscar dados do usuário:', error);
@@ -79,20 +178,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribeAuth();
   }, []);
 
-  // 🔥 LISTENER GLOBAL DE NOTIFICAÇÕES - APENAS PARA CLIENTES
+  // Listener de notificações para clientes
   useEffect(() => {
-    // Só ativar para clientes (não admins)
     if (!user || user.role === 'admin') return;
-
 
     const unsubscribeOrders = cartService.onUserOrders(
       user.uid,
       (orders) => {
-        // Verificar mudanças de status
         const statusChanges = getStatusChanges(previousOrders, orders);
 
         if (statusChanges.length > 0) {
-
           statusChanges.forEach(change => {
             const statusLabels: Record<string, string> = {
               awaiting_payment: 'Aguardando Pagamento',
@@ -105,7 +200,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             const label = statusLabels[change.newStatus] || change.newStatus;
 
-            // 🔔 NOTIFICAÇÃO COM SOM ATIVADO!
             notificationService.showNotification(
               `📦 Pedido #${change.orderNumber}: ${label}`,
               {
@@ -113,7 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   change.newStatus === 'delivered' ? 'success' : 'info',
                 duration: 8000,
                 icon: '🔔',
-                sound: true, // 🔥 SOM ATIVADO!
+                sound: true,
                 onClick: () => {
                   window.location.href = `/order-confirmation/${change.orderId}`;
                 }
@@ -135,9 +229,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const logout = async () => {
-    if (auth.signOut) {
-      await auth.signOut();
-    }
+    await auth.signOut();
     setUser(null);
   };
 

@@ -6,7 +6,7 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, query, collection, getDocs, where } from 'firebase/firestore';
 
 interface RegisterData {
   name: string;
@@ -94,17 +94,48 @@ export const authService = {
   async login(email: string, password: string): Promise<{ success: boolean; error?: string; user?: any }> {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const uid = userCredential.user.uid;
 
       // Buscar dados adicionais do usuário
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      const userData = userDoc.exists() ? userDoc.data() : {};
+      const userDoc = await getDoc(doc(db, 'users', uid));
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        return {
+          success: true,
+          user: {
+            uid,
+            email: userCredential.user.email || email,
+            role: userData.role || 'customer',
+            name: userData.name || '',
+          },
+        };
+      }
+
+      const q = query(collection(db, 'users'), where('uid', '==', uid));
+      const snapshot = await getDocs(q);
+
+       if (!snapshot.empty) {
+      const userData = snapshot.docs[0].data();
+      return {
+        success: true,
+        user: {
+          uid: uid,
+          email: userCredential.user.email || email,
+          role: userData.role || 'customer',
+          name: userData.name || '',
+        },
+      };
+    }
 
       return {
         success: true,
         user: {
-          ...userCredential.user,
-          ...userData
-        }
+          uid,
+          email: userCredential.user.email || email,
+          role: 'customer',
+          name: '',
+        },
       };
     } catch (error: any) {
       console.error('Erro no login:', error);
