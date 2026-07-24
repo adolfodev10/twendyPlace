@@ -66,10 +66,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const saveCart = async () => {
       if (user) {
         try {
-          await setDoc(doc(db, 'users', user.uid), {
-            items,
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
+         const userDoc =  await getDoc(doc(db, 'users', user.uid));
+
+         if(userDoc.exists()) {
+           await setDoc(doc(db, 'users', user.uid), {
+             items,
+             updateAt: serverTimestamp(),
+           }, {merge: true});
+         }
+         else {
+          console.log('Usuário não encontrado');
+         }
         } catch (error) {
           console.error('Erro ao salvar carrinho:', error);
         }
