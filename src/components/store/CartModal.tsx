@@ -89,7 +89,7 @@ const ConfirmModal: React.FC<{
             </p>
 
             {/* Grid de informações */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
               {/* ✅ Dados do Cliente - AGORA EDITÁVEIS */}
               <div className="bg-blue-50 rounded-xl p-4 text-left">
                 <div className="flex items-center justify-between mb-3">
@@ -310,6 +310,8 @@ const ConfirmModal: React.FC<{
       </div>
     );
   };
+
+ConfirmModal.displayName = 'ConfirmModal';
 
 const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
   const { items, removeItem, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
