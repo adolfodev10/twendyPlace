@@ -5,18 +5,17 @@ import { X, ShoppingCart, Trash2, Minus, Plus, CreditCard, Upload, File, Check, 
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { cartService } from '../../services/cartService';
-import { userService } from '../../services/userService'; // ✅ Importar userService
+import { userService } from '../../services/userService';
 
 interface CartModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// Modal de Confirmação com Upload
 const ConfirmModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (userData: { phone: string; address: string; city: string }) => void; // ✅ Passa dados editados
+  onConfirm: (userData: { phone: string; address: string; city: string }) => void;
   total: number;
   items: any[];
   loading: boolean;
@@ -37,19 +36,16 @@ const ConfirmModal: React.FC<{
   uploadedFile, isUploading, uploadedFileURL, userData
 }) => {
 
-  console.log(userData);
 
     if (!isOpen) return null;
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // ✅ ESTADOS PARA EDITAR MORADA E TELEFONE
     const [isEditing, setIsEditing] = useState(false);
     const [editPhone, setEditPhone] = useState(userData?.phone || '');
     const [editAddress, setEditAddress] = useState(userData?.address || '');
     const [editCity, setEditCity] = useState(userData?.city || '');
 
-    // ✅ Atualizar quando userData mudar
     useEffect(() => {
       if (userData) {
         setEditPhone(userData.phone || '');
@@ -68,7 +64,6 @@ const ConfirmModal: React.FC<{
     };
 
     const handleConfirm = () => {
-      // ✅ Passar os dados editados para o pai
       onConfirm({
         phone: editPhone,
         address: editAddress,
@@ -91,9 +86,7 @@ const ConfirmModal: React.FC<{
               Confirme seu pedido de <strong className="text-primary-600">Kz {total.toFixed(2)}</strong>
             </p>
 
-            {/* Grid de informações */}
             <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
-              {/* ✅ Dados do Cliente - AGORA EDITÁVEIS */}
               <div className="bg-blue-50 rounded-xl p-4 text-left">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -124,7 +117,6 @@ const ConfirmModal: React.FC<{
                     </div>
                   </div>
 
-                  {/* ✅ Telefone - EDITÁVEL */}
                   <div className="flex items-start gap-2">
                     <Phone className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -166,7 +158,6 @@ const ConfirmModal: React.FC<{
                     </div>
                   </div>
 
-                  {/* ✅ Cidade - EDITÁVEL */}
                   <div className="flex items-start gap-2">
                     <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -198,7 +189,6 @@ const ConfirmModal: React.FC<{
                 )}
               </div>
 
-              {/* Dados de Pagamento (mantido igual) */}
               <div className="bg-green-50 rounded-xl p-4 text-left">
                 <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-green-600" />
@@ -222,7 +212,6 @@ const ConfirmModal: React.FC<{
               </div>
             </div>
 
-            {/* Resumo do Pedido (mantido igual) */}
             <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left max-h-40 overflow-y-auto">
               <h4 className="font-semibold text-gray-900 mb-2">Resumo do Pedido</h4>
               {items.map((item, index) => (
@@ -289,7 +278,6 @@ const ConfirmModal: React.FC<{
               )}
             </div>
 
-            {/* Botões */}
             <div className="flex gap-3">
               <button onClick={onClose} disabled={loading} className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold disabled:opacity-50">
                 Cancelar
@@ -380,21 +368,18 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     finally { setIsUploading(false); }
   };
 
-  // ✅ handleConfirmOrder agora recebe os dados editados
   const handleConfirmOrder = async (editedData: { phone: string; address: string; city: string }) => {
     if (!uploadedFileURL) { toast.error('Envie o comprovativo'); return; }
     if (!validateStockBeforeCheckout()) { setShowConfirmModal(false); return; }
 
     setLoading(true);
     try {
-      // ✅ Salvar dados do usuário no Firestore
       if (user?.uid) {
-        // Cast to any to allow updating additional profile fields (phone/address/city)
         await userService.updateUser(user.uid, {
           phone: editedData.phone,
           address: editedData.address,
           city: editedData.city,
-        } as any).catch(err => console.log('Erro ao atualizar perfil:', err));
+        } as any).catch(err => console.error('Erro ao atualizar perfil:', err));
       }
 
       const customerData = {
