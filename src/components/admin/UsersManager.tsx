@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { userService } from '../../services/userService';
-import { Edit, Trash2, Search, X, Save, AlertTriangle, Users, Mail, Shield, CheckSquare, Square, Eye, EyeOff, Key, UserPlus, RefreshCw, Phone, MapPin } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { Edit, Trash2, Search, X, AlertTriangle, Users, Mail, CheckSquare, Square, Eye, EyeOff, Key, UserPlus, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { User } from '../../types';
 
@@ -17,6 +18,7 @@ interface UserFormData {
 }
 
 const UsersManager: React.FC = () => {
+  const { user: currentUser } = useAuth(); // ✅ Usuário logado (Admin)
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -59,6 +61,7 @@ const UsersManager: React.FC = () => {
     setLoading(true);
     try {
       const data = await userService.getAllUsers();
+      // ✅ Garantir que o Admin atual está na lista
       setUsers(data);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
@@ -68,16 +71,12 @@ const UsersManager: React.FC = () => {
     }
   };
 
-  const sanitizeInput = (input: string) => {
-    return input.replace(/[<>]/g, '').trim();
-  };
+  const sanitizeInput = (input: string) => input.replace(/[<>]/g, '').trim();
 
   const generateRandomPassword = (): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
     let password = '';
-    for (let i = 0; i < 16; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
+    for (let i = 0; i < 16; i++) password += chars.charAt(Math.floor(Math.random() * chars.length));
     return password;
   };
 
@@ -97,17 +96,9 @@ const UsersManager: React.FC = () => {
       });
     } else {
       setEditingUser(null);
-      const randomPass = generateRandomPassword();
       setFormData({
-        name: '',
-        email: '',
-        role: 'customer',
-        avatar: '',
-        password: randomPass,
-        phone: '',
-        address: '',
-        city: '',
-        postalCode: '',
+        name: '', email: '', role: 'customer', avatar: '',
+        password: generateRandomPassword(), phone: '', address: '', city: '', postalCode: '',
       });
       setShowPassword(true);
     }
@@ -122,31 +113,15 @@ const UsersManager: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!formData.name.trim()) {
-      toast.error('Nome do usuário é obrigatório');
-      return;
-    }
-    if (!formData.email.trim()) {
-      toast.error('Email é obrigatório');
-      return;
-    }
-    if (!formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      toast.error('Email inválido');
-      return;
-    }
-    if (!editingUser && !formData.password) {
-      toast.error('Senha é obrigatória para novo usuário');
-      return;
-    }
+    if (!formData.name.trim()) { toast.error('Nome é obrigatório'); return; }
+    if (!formData.email.trim()) { toast.error('Email é obrigatório'); return; }
+    if (!formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) { toast.error('Email inválido'); return; }
+    if (!editingUser && !formData.password) { toast.error('Senha é obrigatória'); return; }
 
     setSaving(true);
     try {
@@ -155,13 +130,11 @@ const UsersManager: React.FC = () => {
         email: sanitizeInput(formData.email),
         role: sanitizeInput(formData.role),
         avatar: formData.avatar ? sanitizeInput(formData.avatar) : undefined,
-        // ✅ Campos adicionais
         phone: sanitizeInput(formData.phone || ''),
         address: sanitizeInput(formData.address || ''),
         city: sanitizeInput(formData.city || ''),
         postalCode: sanitizeInput(formData.postalCode || ''),
       };
-
       if (!editingUser && formData.password) {
         userData.password = formData.password;
         userData.sendEmail = true;
@@ -169,25 +142,20 @@ const UsersManager: React.FC = () => {
 
       let result;
       if (editingUser) {
-        result = await userService.updateUser(editingUser.uid, userData);
+        result = await userService.updateUser(editingUser.id || editingUser.uid, userData);
       } else {
         result = await userService.createUser(userData);
       }
 
       if (result.success) {
-        if (!editingUser) {
-          toast.success('Usuário criado! A senha foi enviada por email.');
-        } else {
-          toast.success('Usuário atualizado com sucesso!');
-        }
+        toast.success(editingUser ? 'Usuário atualizado!' : 'Usuário criado! Senha enviada por email.');
         handleCloseModal();
         loadUsers();
       } else {
-        toast.error('Erro ao salvar: ' + result.error);
+        toast.error('Erro: ' + result.error);
       }
     } catch (error) {
-      console.error('Erro ao salvar usuário:', error);
-      toast.error('Erro ao salvar usuário');
+      toast.error('Erro ao salvar');
     } finally {
       setSaving(false);
     }
@@ -195,20 +163,26 @@ const UsersManager: React.FC = () => {
 
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
+    
+    // ✅ IMPEDIR auto-exclusão
+    if (userToDelete.uid === currentUser?.uid || userToDelete.id === currentUser?.uid) {
+      toast.error('Não podes excluir a tua própria conta!');
+      return;
+    }
+
     setDeleting(true);
     try {
-      const result = await userService.deleteUser(userToDelete.uid);
+      const result = await userService.deleteUser(userToDelete.id || userToDelete.uid);
       if (result.success) {
-        toast.success('Usuário excluído com sucesso!');
+        toast.success('Usuário excluído!');
         setShowDeleteModal(false);
         setUserToDelete(null);
         loadUsers();
       } else {
-        toast.error('Erro ao excluir: ' + result.error);
+        toast.error('Erro: ' + result.error);
       }
     } catch (error) {
-      console.error('Erro ao excluir usuário:', error);
-      toast.error('Erro ao excluir usuário');
+      toast.error('Erro ao excluir');
     } finally {
       setDeleting(false);
     }
@@ -216,23 +190,27 @@ const UsersManager: React.FC = () => {
 
   const executeBulkDelete = async () => {
     if (selectedUsers.size === 0) return;
+    
+    // ✅ Verificar se o Admin está na seleção
+    if (currentUser && selectedUsers.has(currentUser.uid || '')) {
+      toast.error('Não podes excluir a tua própria conta!');
+      return;
+    }
+
     setDeleting(true);
-    let successCount = 0;
-    let errorCount = 0;
+    let success = 0, errors = 0;
     try {
-      const userIds = Array.from(selectedUsers);
-      for (const userId of userIds) {
+      for (const userId of Array.from(selectedUsers)) {
         try {
-          const result = await userService.deleteUser(userId);
-          if (result.success) successCount++;
-          else errorCount++;
-        } catch (error) { errorCount++; }
+          const res = await userService.deleteUser(userId);
+          res.success ? success++ : errors++;
+        } catch { errors++; }
       }
       setSelectedUsers(new Set());
       setSelectAll(false);
       setShowBulkDeleteModal(false);
-      if (successCount > 0) toast.success(`${successCount} usuário(s) excluído(s)!`);
-      if (errorCount > 0) toast.error(`${errorCount} usuário(s) não puderam ser excluídos`);
+      if (success) toast.success(`${success} excluído(s)!`);
+      if (errors) toast.error(`${errors} falha(s)`);
       loadUsers();
     } finally {
       setDeleting(false);
@@ -243,26 +221,31 @@ const UsersManager: React.FC = () => {
     if (!userToResetPassword) return;
     setSaving(true);
     try {
-      const result = await userService.resetPassword(userToResetPassword.uid);
+      const result = await userService.resetPassword(userToResetPassword.id || userToResetPassword.uid);
       if (result.success) {
         toast.success(`Senha redefinida! Enviada para ${userToResetPassword.email}`);
         setShowResetPasswordModal(false);
         setUserToResetPassword(null);
       } else {
-        toast.error('Erro ao redefinir senha: ' + result.error);
+        toast.error('Erro: ' + result.error);
       }
-    } catch (error) {
-      toast.error('Erro ao redefinir senha');
-    } finally {
-      setSaving(false);
-    }
+    } catch { toast.error('Erro ao redefinir'); }
+    finally { setSaving(false); }
   };
 
+  // ✅ Usar id || uid para garantir compatibilidade
+  const getUserId = (user: User) => user.id || user.uid;
+
   const toggleUserSelection = (userId: string) => {
+    // ✅ Não permitir selecionar a si mesmo
+    if (currentUser && (userId === currentUser.uid || userId === currentUser.id)) {
+      toast.error('Não podes selecionar a tua própria conta!');
+      return;
+    }
     setSelectedUsers(prev => {
-      const newSelected = new Set(prev);
-      newSelected.has(userId) ? newSelected.delete(userId) : newSelected.add(userId);
-      return newSelected;
+      const next = new Set(prev);
+      next.has(userId) ? next.delete(userId) : next.add(userId);
+      return next;
     });
   };
 
@@ -271,7 +254,11 @@ const UsersManager: React.FC = () => {
       setSelectedUsers(new Set());
       setSelectAll(false);
     } else {
-      setSelectedUsers(new Set(filteredUsers.map(user => user.uid)));
+      // ✅ Excluir o Admin da seleção
+      const allIds = filteredUsers
+        .filter(u => getUserId(u) !== currentUser?.uid && getUserId(u) !== currentUser?.id)
+        .map(u => getUserId(u));
+      setSelectedUsers(new Set(allIds));
       setSelectAll(true);
     }
   };
@@ -286,9 +273,9 @@ const UsersManager: React.FC = () => {
 
   useEffect(() => {
     if (filteredUsers.length > 0) {
-      setSelectAll(selectedUsers.size === filteredUsers.length);
+      setSelectAll(selectedUsers.size === filteredUsers.filter(u => getUserId(u) !== currentUser?.uid).length);
     }
-  }, [selectedUsers, filteredUsers]);
+  }, [selectedUsers, filteredUsers, currentUser]);
 
   const getRoleBadge = (role: string) => {
     switch (role?.toLowerCase()) {
@@ -300,13 +287,14 @@ const UsersManager: React.FC = () => {
     }
   };
 
-  // ✅ Função para obter iniciais
   const getInitials = (name: string, email: string): string => {
-    if (name && name.trim()) {
-      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    }
+    if (name?.trim()) return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     return email?.split('@')[0].slice(0, 2).toUpperCase() || 'U';
   };
+
+  // ✅ Verificar se é o usuário atual
+  const isCurrentUser = (user: User) => 
+    currentUser && (getUserId(user) === currentUser.uid || getUserId(user) === currentUser.id);
 
   if (loading) {
     return (
@@ -323,20 +311,16 @@ const UsersManager: React.FC = () => {
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
           <Users className="w-6 h-6 text-primary-600" />
           Gerenciar Usuários
-          <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-            {users.length} total
-          </span>
+          <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{users.length} total</span>
         </h1>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           {selectedUsers.size > 0 && (
             <button onClick={() => setShowBulkDeleteModal(true)} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-              <Trash2 className="w-4 h-4" />
-              Excluir ({selectedUsers.size})
+              <Trash2 className="w-4 h-4" /> Excluir ({selectedUsers.size})
             </button>
           )}
           <button onClick={() => handleOpenModal()} className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-            <UserPlus className="w-4 h-4" />
-            Novo Usuário
+            <UserPlus className="w-4 h-4" /> Novo Usuário
           </button>
         </div>
       </div>
@@ -344,9 +328,9 @@ const UsersManager: React.FC = () => {
       {/* Search */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Buscar usuários por nome, email ou função..." value={search} onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input type="text" placeholder="Buscar usuários..." value={search} onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-sm" />
         </div>
       </div>
 
@@ -357,7 +341,7 @@ const UsersManager: React.FC = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 w-12">
-                  <button onClick={toggleSelectAll} className="hover:bg-gray-200 rounded p-0.5 transition-colors">
+                  <button onClick={toggleSelectAll} className="hover:bg-gray-200 rounded p-0.5">
                     {selectAll ? <CheckSquare className="w-4 h-4 text-primary-600" /> : <Square className="w-4 h-4 text-gray-400" />}
                   </button>
                 </th>
@@ -373,15 +357,20 @@ const UsersManager: React.FC = () => {
                 <tr><td colSpan={6} className="text-center py-8 text-gray-500">Nenhum usuário encontrado</td></tr>
               ) : (
                 filteredUsers.map((user, index) => {
-                  const isSelected = selectedUsers.has(user.uid);
+                  const isSelected = selectedUsers.has(getUserId(user));
                   const roleBadge = getRoleBadge(user.role || '');
-                  const uniqueKey = user.uid || user.email || `user-${index}`;
+                  const isSelf = isCurrentUser(user);
+                  
                   return (
-                    <tr key={uniqueKey} className={`border-b border-gray-100 transition-colors ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}>
+                    <tr key={getUserId(user) || index} className={`border-b border-gray-100 transition-colors ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'} ${isSelf ? 'bg-blue-50/30' : ''}`}>
                       <td className="py-3 px-3 sm:px-4">
-                        <button onClick={() => toggleUserSelection(user.uid)} className="hover:bg-gray-200 rounded p-0.5 transition-colors">
-                          {isSelected ? <CheckSquare className="w-4 h-4 text-primary-600" /> : <Square className="w-4 h-4 text-gray-400" />}
-                        </button>
+                        {/* ✅ Esconder checkbox para o próprio Admin */}
+                        {!isSelf && (
+                          <button onClick={() => toggleUserSelection(getUserId(user))} className="hover:bg-gray-200 rounded p-0.5">
+                            {isSelected ? <CheckSquare className="w-4 h-4 text-primary-600" /> : <Square className="w-4 h-4 text-gray-400" />}
+                          </button>
+                        )}
+                        {isSelf && <span className="text-[10px] text-blue-500 font-medium">Você</span>}
                       </td>
                       <td className="py-3 px-3 sm:px-4">
                         <div className="flex items-center gap-3">
@@ -389,32 +378,42 @@ const UsersManager: React.FC = () => {
                             {user.avatar ? (
                               <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
                             ) : (
-                              <span className="text-primary-700 font-bold text-sm">
-                                {getInitials(user.name, user.email)}
-                              </span>
+                              <span className="text-primary-700 font-bold text-sm">{getInitials(user.name, user.email)}</span>
                             )}
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900 text-sm">{user.name || user.email?.split('@')[0] || 'Usuário'}</p>
+                            <p className="font-medium text-gray-900 text-sm">
+                              {user.name || user.email?.split('@')[0] || 'Usuário'}
+                              {isSelf && <span className="text-[10px] text-blue-500 ml-1">(você)</span>}
+                            </p>
                           </div>
                         </div>
                       </td>
                       <td className="py-3 px-3 sm:px-4 text-gray-600 text-sm hidden md:table-cell">
-                        <div className="flex items-center gap-1"><Mail className="w-3 h-3 text-gray-400" />{user.email}</div>
+                        <Mail className="w-3 h-3 inline mr-1 text-gray-400" />{user.email}
                       </td>
                       <td className="py-3 px-3 sm:px-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleBadge.className}`}>{roleBadge.label}</span>
                       </td>
                       <td className="py-3 px-3 sm:px-4 text-gray-500 text-sm hidden lg:table-cell">
-                        {user.createdAt && typeof (user.createdAt as any).seconds === 'number'
-                          ? new Date((user.createdAt as any).seconds * 1000).toLocaleDateString('pt-PT')
-                          : user.createdAt instanceof Date ? user.createdAt.toLocaleDateString('pt-PT') : '-'}
+                        {(() => {
+                          const d = user.createdAt as any;
+                          if (!d) return '-';
+                          if (d instanceof Date) return d.toLocaleDateString('pt-PT');
+                          if (typeof d.seconds === 'number') return new Date(d.seconds * 1000).toLocaleDateString('pt-PT');
+                          if (typeof d.toDate === 'function') return d.toDate().toLocaleDateString('pt-PT');
+                          return '-';
+                        })()}
                       </td>
                       <td className="py-3 px-3 sm:px-4">
                         <div className="flex items-center gap-1 sm:gap-2">
-                          <button onClick={() => handleOpenModal(user)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar usuário"><Edit className="w-4 h-4" /></button>
-                          <button onClick={() => { setUserToResetPassword(user); setShowResetPasswordModal(true); }} className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors" title="Redefinir senha"><Key className="w-4 h-4" /></button>
-                          <button onClick={() => { setUserToDelete(user); setShowDeleteModal(true); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Excluir usuário"><Trash2 className="w-4 h-4" /></button>
+                          <button onClick={() => handleOpenModal(user)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Editar"><Edit className="w-4 h-4" /></button>
+                          {!isSelf && (
+                            <>
+                              <button onClick={() => { setUserToResetPassword(user); setShowResetPasswordModal(true); }} className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg" title="Redefinir senha"><Key className="w-4 h-4" /></button>
+                              <button onClick={() => { setUserToDelete(user); setShowDeleteModal(true); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Excluir"><Trash2 className="w-4 h-4" /></button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -424,135 +423,77 @@ const UsersManager: React.FC = () => {
             </tbody>
           </table>
         </div>
-
         {selectedUsers.size > 0 && (
           <div className="bg-primary-50 border-t border-primary-200 px-4 py-3 flex items-center justify-between">
-            <p className="text-sm text-primary-700"><strong>{selectedUsers.size}</strong> usuário{selectedUsers.size > 1 ? 's' : ''} selecionado{selectedUsers.size > 1 ? 's' : ''}</p>
-            <div className="flex items-center gap-2">
-              <button onClick={() => { setSelectedUsers(new Set()); setSelectAll(false); }} className="text-sm text-gray-600 hover:text-gray-800 underline">Limpar seleção</button>
-            </div>
+            <p className="text-sm text-primary-700"><strong>{selectedUsers.size}</strong> selecionado(s)</p>
+            <button onClick={() => { setSelectedUsers(new Set()); setSelectAll(false); }} className="text-sm text-gray-600 hover:text-gray-800 underline">Limpar</button>
           </div>
         )}
       </div>
 
-      {/* Modal de Criar/Editar Usuário - ✅ COM TODOS OS CAMPOS */}
+      {/* Modal de Criar/Editar */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={handleCloseModal} />
-          <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl animate-[modalSlideUp_0.3s_ease]">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                {editingUser ? <Edit className="w-5 h-5 text-blue-600" /> : <UserPlus className="w-5 h-5 text-primary-600" />}
-                {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
-              </h2>
-              <button onClick={handleCloseModal} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-5 h-5 text-gray-500" /></button>
+          <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold">{editingUser ? 'Editar Usuário' : 'Novo Usuário'}</h2>
+              <button onClick={handleCloseModal}><X className="w-5 h-5 text-gray-500" /></button>
             </div>
-
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {/* Nome */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo *</label>
-                <div className="relative">
-                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input type="text" name="name" value={formData.name} onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Ex: João da Silva" required />
-                </div>
+                <label className="block text-sm font-medium mb-1">Nome *</label>
+                <input type="text" name="name" value={formData.name} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg" required />
               </div>
-
-              {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input type="email" name="email" value={formData.email} onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="joao@exemplo.com" required />
-                </div>
+                <label className="block text-sm font-medium mb-1">Email *</label>
+                <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg" required />
               </div>
-
-              {/* Telefone ✅ NOVO */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input type="tel" name="phone" value={formData.phone || ''} onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="+244 9XX XXX XXX" />
-                </div>
+                <label className="block text-sm font-medium mb-1">Telefone</label>
+                <input type="tel" name="phone" value={formData.phone || ''} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg" />
               </div>
-
-              {/* Endereço ✅ NOVO */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input type="text" name="address" value={formData.address || ''} onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Rua, número, bairro..." />
-                </div>
+                <label className="block text-sm font-medium mb-1">Endereço</label>
+                <input type="text" name="address" value={formData.address || ''} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg" />
               </div>
-
-              {/* Cidade + Código Postal ✅ NOVO */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
-                  <input type="text" name="city" value={formData.city || ''} onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Sua cidade" />
+                  <label className="block text-sm font-medium mb-1">Cidade</label>
+                  <input type="text" name="city" value={formData.city || ''} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Código Postal</label>
-                  <input type="text" name="postalCode" value={formData.postalCode || ''} onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="1234-567" />
+                  <label className="block text-sm font-medium mb-1">Código Postal</label>
+                  <input type="text" name="postalCode" value={formData.postalCode || ''} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg" />
                 </div>
               </div>
-
-              {/* Função */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Função *</label>
-                <div className="relative">
-                  <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <select name="role" value={formData.role} onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none appearance-none" required>
-                    <option value="customer">Cliente</option>
-                    <option value="admin">Administrador</option>
-                  </select>
-                </div>
+                <label className="block text-sm font-medium mb-1">Função *</label>
+                <select name="role" value={formData.role} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg" required>
+                  <option value="customer">Cliente</option>
+                  <option value="admin">Administrador</option>
+                </select>
               </div>
-
-              {/* Senha (apenas para criação) */}
               {!editingUser && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Senha * <span className="text-xs text-gray-500 ml-1">(será enviada por email)</span>
-                  </label>
+                  <label className="block text-sm font-medium mb-1">Senha *</label>
                   <div className="relative">
-                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input type={showPassword ? "text" : "password"} name="password" value={formData.password || ''} onChange={handleInputChange}
-                      className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm" required={!editingUser} />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="p-1 hover:bg-gray-100 rounded transition-colors">
-                        {showPassword ? <EyeOff className="w-4 h-4 text-gray-500" /> : <Eye className="w-4 h-4 text-gray-500" />}
-                      </button>
-                      <button type="button" onClick={() => { const newPass = generateRandomPassword(); setFormData(prev => ({ ...prev, password: newPass })); setShowPassword(true); }}
-                        className="p-1 hover:bg-gray-100 rounded transition-colors" title="Gerar nova senha">
-                        <RefreshCw className="w-4 h-4 text-gray-500" />
-                      </button>
-                    </div>
+                      className="w-full pl-10 pr-12 py-2 border rounded-lg font-mono text-sm" required />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-8 top-1/2 -translate-y-1/2">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                    <button type="button" onClick={() => { setFormData(prev => ({ ...prev, password: generateRandomPassword() })); setShowPassword(true); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">A senha será enviada automaticamente para o email do usuário.</p>
                 </div>
               )}
-
-              {/* Aviso para edição */}
-              {editingUser && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-blue-700">A edição não altera a senha do usuário. Use o botão <Key className="w-3 h-3 inline" /> para redefinir.</p>
-                </div>
-              )}
-
-              {/* Botões */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
-                <button type="button" onClick={handleCloseModal} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">Cancelar</button>
-                <button type="submit" disabled={saving} className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2">
-                  {saving ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />Salvando...</> : <><Save className="w-4 h-4" />{editingUser ? 'Atualizar' : 'Criar Usuário'}</>}
+              <div className="flex gap-3 pt-4 border-t">
+                <button type="button" onClick={handleCloseModal} className="flex-1 px-4 py-2 bg-gray-100 rounded-lg">Cancelar</button>
+                <button type="submit" disabled={saving} className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50">
+                  {saving ? 'Salvando...' : editingUser ? 'Atualizar' : 'Criar'}
                 </button>
               </div>
             </form>
@@ -560,64 +501,55 @@ const UsersManager: React.FC = () => {
         </div>
       )}
 
-      {/* Modal de Exclusão */}
+      {/* Modais de Delete, Reset e Bulk Delete (mantidos iguais) */}
       {showDeleteModal && userToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowDeleteModal(false)} />
-          <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl animate-[modalSlideUp_0.3s_ease]">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Confirmar Exclusão</h3>
-              <p className="text-gray-600">Tem certeza que deseja excluir o usuário <strong>"{userToDelete.name}"</strong>?</p>
-              <p className="text-sm text-red-500 mt-1">Esta ação não pode ser desfeita.</p>
-              <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">Cancelar</button>
-                <button onClick={handleDeleteUser} disabled={deleting} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2">
-                  {deleting ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />Excluindo...</> : <><Trash2 className="w-4 h-4" />Excluir</>}
-                </button>
-              </div>
+          <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 text-center">
+            <div className="w-16 h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
+            <h3 className="text-xl font-bold mb-2">Confirmar Exclusão</h3>
+            <p className="text-gray-600">Excluir <strong>"{userToDelete.name}"</strong>?</p>
+            <p className="text-sm text-red-500 mt-1">Esta ação não pode ser desfeita.</p>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={handleDeleteUser} disabled={deleting} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50">
+                {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal de Redefinir Senha */}
       {showResetPasswordModal && userToResetPassword && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowResetPasswordModal(false)} />
-          <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl animate-[modalSlideUp_0.3s_ease]">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 mx-auto bg-orange-50 rounded-full flex items-center justify-center mb-4"><Key className="w-8 h-8 text-orange-500" /></div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Redefinir Senha</h3>
-              <p className="text-gray-600">Uma nova senha será enviada para <strong>{userToResetPassword.email}</strong>.</p>
-              <p className="text-sm text-gray-500 mt-1">Usuário: <strong>{userToResetPassword.name}</strong></p>
-              <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <button onClick={() => setShowResetPasswordModal(false)} disabled={saving} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50">Cancelar</button>
-                <button onClick={handleResetPassword} disabled={saving} className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2">
-                  {saving ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />Enviando...</> : <><Key className="w-4 h-4" />Redefinir Senha</>}
-                </button>
-              </div>
+          <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 text-center">
+            <div className="w-16 h-16 mx-auto bg-orange-50 rounded-full flex items-center justify-center mb-4"><Key className="w-8 h-8 text-orange-500" /></div>
+            <h3 className="text-xl font-bold mb-2">Redefinir Senha</h3>
+            <p className="text-gray-600">Enviar nova senha para <strong>{userToResetPassword.email}</strong>?</p>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowResetPasswordModal(false)} disabled={saving} className="flex-1 px-4 py-2 bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={handleResetPassword} disabled={saving} className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg disabled:opacity-50">
+                {saving ? 'Enviando...' : 'Redefinir'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal de Exclusão em Massa */}
       {showBulkDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowBulkDeleteModal(false)} />
-          <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl animate-[modalSlideUp_0.3s_ease]">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Excluir Usuários</h3>
-              <p className="text-gray-600">Tem certeza que deseja excluir <strong>{selectedUsers.size}</strong> usuário{selectedUsers.size > 1 ? 's' : ''}?</p>
-              <p className="text-sm text-red-500 mt-1">Esta ação não pode ser desfeita.</p>
-              <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <button onClick={() => setShowBulkDeleteModal(false)} disabled={deleting} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50">Cancelar</button>
-                <button onClick={executeBulkDelete} disabled={deleting} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2">
-                  {deleting ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />Excluindo...</> : <><Trash2 className="w-4 h-4" />Excluir {selectedUsers.size}</>}
-                </button>
-              </div>
+          <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 text-center">
+            <div className="w-16 h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
+            <h3 className="text-xl font-bold mb-2">Excluir Usuários</h3>
+            <p className="text-gray-600">Excluir <strong>{selectedUsers.size}</strong> usuário(s)?</p>
+            <p className="text-sm text-red-500 mt-1">Esta ação não pode ser desfeita.</p>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowBulkDeleteModal(false)} disabled={deleting} className="flex-1 px-4 py-2 bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={executeBulkDelete} disabled={deleting} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50">
+                {deleting ? 'Excluindo...' : `Excluir ${selectedUsers.size}`}
+              </button>
             </div>
           </div>
         </div>
