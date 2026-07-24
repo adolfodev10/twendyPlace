@@ -10,7 +10,8 @@ import {
   orderBy,
   serverTimestamp,
   DocumentData,
-  QueryDocumentSnapshot
+  QueryDocumentSnapshot,
+  where
 } from 'firebase/firestore';
 import {
   createUserWithEmailAndPassword,
@@ -171,8 +172,27 @@ export const userService = {
 
   async deleteUser(id: string): Promise<{ success: boolean; error?: string }> {
     try {
-      await deleteDoc(doc(db, 'users', id));
-      return { success: true };
+      // 1. Tentar deletar diretamente (se o ID do doc = uid)
+      const docRef = doc(db, 'users', id);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        await deleteDoc(docRef);
+        return { success: true };
+      }
+
+      // 2. Buscar por campo 'uid'
+      const q = query(collection(db, 'users'), where('uid', '==', id));
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        await deleteDoc(snapshot.docs[0].ref);
+        return { success: true };
+      }
+
+      // 3. Buscar por email (último recurso)
+      // Se tiver o email do usuário, busca por ele
+      return { success: false, error: 'Usuário não encontrado' };
     } catch (error: any) {
       console.error('Erro ao excluir usuário:', error);
       return { success: false, error: error.message };

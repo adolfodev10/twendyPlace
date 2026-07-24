@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User } from '../../types';
 import { userService } from '../../services/userService';
-import { Edit, Trash2, Search, X, Save, AlertTriangle, Users, Mail, Shield, CheckSquare, Square, Eye, EyeOff, Key, UserPlus, RefreshCw } from 'lucide-react';
+import { Edit, Trash2, Search, X, Save, AlertTriangle, Users, Mail, Shield, CheckSquare, Square, Eye, EyeOff, Key, UserPlus, RefreshCw, Phone, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { User } from '../../types';
 
 interface UserFormData {
   name: string;
@@ -10,6 +10,10 @@ interface UserFormData {
   role: string;
   avatar?: string;
   password?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
 }
 
 const UsersManager: React.FC = () => {
@@ -24,7 +28,6 @@ const UsersManager: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Seleção múltipla
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -37,6 +40,10 @@ const UsersManager: React.FC = () => {
     role: 'customer',
     avatar: '',
     password: '',
+    phone: '',
+    address: '',
+    city: '',
+    postalCode: '',
   });
 
   useEffect(() => {
@@ -83,6 +90,10 @@ const UsersManager: React.FC = () => {
         role: user.role || 'customer',
         avatar: user.avatar || '',
         password: '',
+        phone: user.phone || '',
+        address: user.address || '',
+        city: user.city || '',
+        postalCode: user.postalCode || '',
       });
     } else {
       setEditingUser(null);
@@ -93,6 +104,10 @@ const UsersManager: React.FC = () => {
         role: 'customer',
         avatar: '',
         password: randomPass,
+        phone: '',
+        address: '',
+        city: '',
+        postalCode: '',
       });
       setShowPassword(true);
     }
@@ -140,13 +155,16 @@ const UsersManager: React.FC = () => {
         email: sanitizeInput(formData.email),
         role: sanitizeInput(formData.role),
         avatar: formData.avatar ? sanitizeInput(formData.avatar) : undefined,
+        // ✅ Campos adicionais
+        phone: sanitizeInput(formData.phone || ''),
+        address: sanitizeInput(formData.address || ''),
+        city: sanitizeInput(formData.city || ''),
+        postalCode: sanitizeInput(formData.postalCode || ''),
       };
 
-
-      // Só envia senha se for criação OU redefinição de senha
       if (!editingUser && formData.password) {
         userData.password = formData.password;
-        userData.sendEmail = true; // Flag para backend enviar email com a senha
+        userData.sendEmail = true;
       }
 
       let result;
@@ -177,7 +195,6 @@ const UsersManager: React.FC = () => {
 
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
-
     setDeleting(true);
     try {
       const result = await userService.deleteUser(userToDelete.uid);
@@ -197,57 +214,38 @@ const UsersManager: React.FC = () => {
     }
   };
 
-  // Exclusão em massa
   const executeBulkDelete = async () => {
     if (selectedUsers.size === 0) return;
-
     setDeleting(true);
     let successCount = 0;
     let errorCount = 0;
-
     try {
       const userIds = Array.from(selectedUsers);
-
       for (const userId of userIds) {
         try {
           const result = await userService.deleteUser(userId);
-          if (result.success) {
-            successCount++;
-          } else {
-            errorCount++;
-          }
-        } catch (error) {
-          errorCount++;
-        }
+          if (result.success) successCount++;
+          else errorCount++;
+        } catch (error) { errorCount++; }
       }
-
       setSelectedUsers(new Set());
       setSelectAll(false);
       setShowBulkDeleteModal(false);
-
-      if (successCount > 0) {
-        toast.success(`${successCount} usuário(s) excluído(s)!`);
-      }
-      if (errorCount > 0) {
-        toast.error(`${errorCount} usuário(s) não puderam ser excluídos`);
-      }
-
+      if (successCount > 0) toast.success(`${successCount} usuário(s) excluído(s)!`);
+      if (errorCount > 0) toast.error(`${errorCount} usuário(s) não puderam ser excluídos`);
       loadUsers();
     } finally {
       setDeleting(false);
     }
   };
 
-  // Redefinir senha
   const handleResetPassword = async () => {
     if (!userToResetPassword) return;
-
     setSaving(true);
     try {
       const result = await userService.resetPassword(userToResetPassword.uid);
-
       if (result.success) {
-        toast.success(`Senha redefinida! A nova senha foi enviada para ${userToResetPassword.email}`);
+        toast.success(`Senha redefinida! Enviada para ${userToResetPassword.email}`);
         setShowResetPasswordModal(false);
         setUserToResetPassword(null);
       } else {
@@ -260,15 +258,10 @@ const UsersManager: React.FC = () => {
     }
   };
 
-  // Seleção
   const toggleUserSelection = (userId: string) => {
     setSelectedUsers(prev => {
       const newSelected = new Set(prev);
-      if (newSelected.has(userId)) {
-        newSelected.delete(userId);
-      } else {
-        newSelected.add(userId);
-      }
+      newSelected.has(userId) ? newSelected.delete(userId) : newSelected.add(userId);
       return newSelected;
     });
   };
@@ -278,8 +271,7 @@ const UsersManager: React.FC = () => {
       setSelectedUsers(new Set());
       setSelectAll(false);
     } else {
-      const allIds = new Set(filteredUsers.map(user => user.uid));
-      setSelectedUsers(allIds);
+      setSelectedUsers(new Set(filteredUsers.map(user => user.uid)));
       setSelectAll(true);
     }
   };
@@ -308,6 +300,14 @@ const UsersManager: React.FC = () => {
     }
   };
 
+  // ✅ Função para obter iniciais
+  const getInitials = (name: string, email: string): string => {
+    if (name && name.trim()) {
+      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    return email?.split('@')[0].slice(0, 2).toUpperCase() || 'U';
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -318,6 +318,7 @@ const UsersManager: React.FC = () => {
 
   return (
     <div className="lg:-mt-32">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
           <Users className="w-6 h-6 text-primary-600" />
@@ -328,18 +329,12 @@ const UsersManager: React.FC = () => {
         </h1>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           {selectedUsers.size > 0 && (
-            <button
-              onClick={() => setShowBulkDeleteModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
+            <button onClick={() => setShowBulkDeleteModal(true)} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
               <Trash2 className="w-4 h-4" />
               Excluir ({selectedUsers.size})
             </button>
           )}
-          <button
-            onClick={() => handleOpenModal()}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-          >
+          <button onClick={() => handleOpenModal()} className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
             <UserPlus className="w-4 h-4" />
             Novo Usuário
           </button>
@@ -350,13 +345,8 @@ const UsersManager: React.FC = () => {
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar usuários por nome, email ou função..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
-          />
+          <input type="text" placeholder="Buscar usuários por nome, email ou função..." value={search} onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm" />
         </div>
       </div>
 
@@ -380,16 +370,11 @@ const UsersManager: React.FC = () => {
             </thead>
             <tbody>
               {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-8 text-gray-500">
-                    Nenhum usuário encontrado
-                  </td>
-                </tr>
+                <tr><td colSpan={6} className="text-center py-8 text-gray-500">Nenhum usuário encontrado</td></tr>
               ) : (
                 filteredUsers.map((user, index) => {
                   const isSelected = selectedUsers.has(user.uid);
                   const roleBadge = getRoleBadge(user.role || '');
-                  // ✅ Garantir key única
                   const uniqueKey = user.uid || user.email || `user-${index}`;
                   return (
                     <tr key={uniqueKey} className={`border-b border-gray-100 transition-colors ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}>
@@ -400,45 +385,36 @@ const UsersManager: React.FC = () => {
                       </td>
                       <td className="py-3 px-3 sm:px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
                             {user.avatar ? (
                               <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
                             ) : (
                               <span className="text-primary-700 font-bold text-sm">
-                                {user.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
+                                {getInitials(user.name, user.email)}
                               </span>
                             )}
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900 text-sm">{user.name}</p>
+                            <p className="font-medium text-gray-900 text-sm">{user.name || user.email?.split('@')[0] || 'Usuário'}</p>
                           </div>
                         </div>
                       </td>
                       <td className="py-3 px-3 sm:px-4 text-gray-600 text-sm hidden md:table-cell">
-                        <div className="flex items-center gap-1">
-                          <Mail className="w-3 h-3 text-gray-400" />
-                          {user.email}
-                        </div>
+                        <div className="flex items-center gap-1"><Mail className="w-3 h-3 text-gray-400" />{user.email}</div>
                       </td>
                       <td className="py-3 px-3 sm:px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleBadge.className}`}>
-                          {roleBadge.label}
-                        </span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleBadge.className}`}>{roleBadge.label}</span>
                       </td>
                       <td className="py-3 px-3 sm:px-4 text-gray-500 text-sm hidden lg:table-cell">
-                        {user.createdAt && typeof (user.createdAt as any).seconds === 'number' ? new Date((user.createdAt as any).seconds * 1000).toLocaleDateString('pt-PT') : user.createdAt instanceof Date ? user.createdAt.toLocaleDateString('pt-PT') : '-'}
+                        {user.createdAt && typeof (user.createdAt as any).seconds === 'number'
+                          ? new Date((user.createdAt as any).seconds * 1000).toLocaleDateString('pt-PT')
+                          : user.createdAt instanceof Date ? user.createdAt.toLocaleDateString('pt-PT') : '-'}
                       </td>
                       <td className="py-3 px-3 sm:px-4">
                         <div className="flex items-center gap-1 sm:gap-2">
-                          <button onClick={() => handleOpenModal(user)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar usuário">
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => { setUserToResetPassword(user); setShowResetPasswordModal(true); }} className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors" title="Redefinir senha">
-                            <Key className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => { setUserToDelete(user); setShowDeleteModal(true); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Excluir usuário">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <button onClick={() => handleOpenModal(user)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar usuário"><Edit className="w-4 h-4" /></button>
+                          <button onClick={() => { setUserToResetPassword(user); setShowResetPasswordModal(true); }} className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors" title="Redefinir senha"><Key className="w-4 h-4" /></button>
+                          <button onClick={() => { setUserToDelete(user); setShowDeleteModal(true); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Excluir usuário"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -449,22 +425,17 @@ const UsersManager: React.FC = () => {
           </table>
         </div>
 
-        {/* Barra de seleção */}
         {selectedUsers.size > 0 && (
           <div className="bg-primary-50 border-t border-primary-200 px-4 py-3 flex items-center justify-between">
-            <p className="text-sm text-primary-700">
-              <strong>{selectedUsers.size}</strong> usuário{selectedUsers.size > 1 ? 's' : ''} selecionado{selectedUsers.size > 1 ? 's' : ''}
-            </p>
+            <p className="text-sm text-primary-700"><strong>{selectedUsers.size}</strong> usuário{selectedUsers.size > 1 ? 's' : ''} selecionado{selectedUsers.size > 1 ? 's' : ''}</p>
             <div className="flex items-center gap-2">
-              <button onClick={() => { setSelectedUsers(new Set()); setSelectAll(false); }} className="text-sm text-gray-600 hover:text-gray-800 underline">
-                Limpar seleção
-              </button>
+              <button onClick={() => { setSelectedUsers(new Set()); setSelectAll(false); }} className="text-sm text-gray-600 hover:text-gray-800 underline">Limpar seleção</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Modal de Criar/Editar Usuário */}
+      {/* Modal de Criar/Editar Usuário - ✅ COM TODOS OS CAMPOS */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={handleCloseModal} />
@@ -474,24 +445,18 @@ const UsersManager: React.FC = () => {
                 {editingUser ? <Edit className="w-5 h-5 text-blue-600" /> : <UserPlus className="w-5 h-5 text-primary-600" />}
                 {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
               </h2>
-              <button onClick={handleCloseModal} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
+              <button onClick={handleCloseModal} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-5 h-5 text-gray-500" /></button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               {/* Nome */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo *</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                  placeholder="Ex: João da Silva"
-                  required
-                />
+                <div className="relative">
+                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input type="text" name="name" value={formData.name} onChange={handleInputChange}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Ex: João da Silva" required />
+                </div>
               </div>
 
               {/* Email */}
@@ -499,15 +464,42 @@ const UsersManager: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                    placeholder="joao@exemplo.com"
-                    required
-                  />
+                  <input type="email" name="email" value={formData.email} onChange={handleInputChange}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="joao@exemplo.com" required />
+                </div>
+              </div>
+
+              {/* Telefone ✅ NOVO */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input type="tel" name="phone" value={formData.phone || ''} onChange={handleInputChange}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="+244 9XX XXX XXX" />
+                </div>
+              </div>
+
+              {/* Endereço ✅ NOVO */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input type="text" name="address" value={formData.address || ''} onChange={handleInputChange}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Rua, número, bairro..." />
+                </div>
+              </div>
+
+              {/* Cidade + Código Postal ✅ NOVO */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
+                  <input type="text" name="city" value={formData.city || ''} onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Sua cidade" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Código Postal</label>
+                  <input type="text" name="postalCode" value={formData.postalCode || ''} onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="1234-567" />
                 </div>
               </div>
 
@@ -516,13 +508,8 @@ const UsersManager: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Função *</label>
                 <div className="relative">
                   <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none appearance-none"
-                    required
-                  >
+                  <select name="role" value={formData.role} onChange={handleInputChange}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none appearance-none" required>
                     <option value="customer">Cliente</option>
                     <option value="admin">Administrador</option>
                   </select>
@@ -533,37 +520,18 @@ const UsersManager: React.FC = () => {
               {!editingUser && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Senha *
-                    <span className="text-xs text-gray-500 ml-1">(será enviada por email)</span>
+                    Senha * <span className="text-xs text-gray-500 ml-1">(será enviada por email)</span>
                   </label>
                   <div className="relative">
                     <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      name="password"
-                      value={formData.password || ''}
-                      onChange={handleInputChange}
-                      className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
-                      required={!editingUser}
-                    />
+                    <input type={showPassword ? "text" : "password"} name="password" value={formData.password || ''} onChange={handleInputChange}
+                      className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm" required={!editingUser} />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="p-1 hover:bg-gray-100 rounded transition-colors"
-                      >
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="p-1 hover:bg-gray-100 rounded transition-colors">
                         {showPassword ? <EyeOff className="w-4 h-4 text-gray-500" /> : <Eye className="w-4 h-4 text-gray-500" />}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newPass = generateRandomPassword();
-                          setFormData(prev => ({ ...prev, password: newPass }));
-                          setShowPassword(true);
-                        }}
-                        className="p-1 hover:bg-gray-100 rounded transition-colors"
-                        title="Gerar nova senha"
-                      >
+                      <button type="button" onClick={() => { const newPass = generateRandomPassword(); setFormData(prev => ({ ...prev, password: newPass })); setShowPassword(true); }}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors" title="Gerar nova senha">
                         <RefreshCw className="w-4 h-4 text-gray-500" />
                       </button>
                     </div>
@@ -576,29 +544,15 @@ const UsersManager: React.FC = () => {
               {editingUser && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-blue-700">
-                    A edição não altera a senha do usuário. Para redefinir a senha, use o botão <Key className="w-3 h-3 inline" /> na lista de usuários.
-                  </p>
+                  <p className="text-xs text-blue-700">A edição não altera a senha do usuário. Use o botão <Key className="w-3 h-3 inline" /> para redefinir.</p>
                 </div>
               )}
 
               {/* Botões */}
               <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
-                <button type="button" onClick={handleCloseModal} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">
-                  Cancelar
-                </button>
+                <button type="button" onClick={handleCloseModal} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">Cancelar</button>
                 <button type="submit" disabled={saving} className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2">
-                  {saving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      {editingUser ? 'Atualizar' : 'Criar Usuário'}
-                    </>
-                  )}
+                  {saving ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />Salvando...</> : <><Save className="w-4 h-4" />{editingUser ? 'Atualizar' : 'Criar Usuário'}</>}
                 </button>
               </div>
             </form>
@@ -612,16 +566,12 @@ const UsersManager: React.FC = () => {
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowDeleteModal(false)} />
           <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl animate-[modalSlideUp_0.3s_ease]">
             <div className="p-6 text-center">
-              <div className="w-16 h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4">
-                <AlertTriangle className="w-8 h-8 text-red-500" />
-              </div>
+              <div className="w-16 h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Confirmar Exclusão</h3>
               <p className="text-gray-600">Tem certeza que deseja excluir o usuário <strong>"{userToDelete.name}"</strong>?</p>
               <p className="text-sm text-red-500 mt-1">Esta ação não pode ser desfeita.</p>
               <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">
-                  Cancelar
-                </button>
+                <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium">Cancelar</button>
                 <button onClick={handleDeleteUser} disabled={deleting} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2">
                   {deleting ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />Excluindo...</> : <><Trash2 className="w-4 h-4" />Excluir</>}
                 </button>
@@ -637,18 +587,12 @@ const UsersManager: React.FC = () => {
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowResetPasswordModal(false)} />
           <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl animate-[modalSlideUp_0.3s_ease]">
             <div className="p-6 text-center">
-              <div className="w-16 h-16 mx-auto bg-orange-50 rounded-full flex items-center justify-center mb-4">
-                <Key className="w-8 h-8 text-orange-500" />
-              </div>
+              <div className="w-16 h-16 mx-auto bg-orange-50 rounded-full flex items-center justify-center mb-4"><Key className="w-8 h-8 text-orange-500" /></div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Redefinir Senha</h3>
-              <p className="text-gray-600">
-                Uma nova senha será gerada e enviada para <strong>{userToResetPassword.email}</strong>.
-              </p>
-              <p className="text-sm text-gray-500 mt-1">O usuário <strong>{userToResetPassword.name}</strong> receberá a nova senha por email.</p>
+              <p className="text-gray-600">Uma nova senha será enviada para <strong>{userToResetPassword.email}</strong>.</p>
+              <p className="text-sm text-gray-500 mt-1">Usuário: <strong>{userToResetPassword.name}</strong></p>
               <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <button onClick={() => setShowResetPasswordModal(false)} disabled={saving} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50">
-                  Cancelar
-                </button>
+                <button onClick={() => setShowResetPasswordModal(false)} disabled={saving} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50">Cancelar</button>
                 <button onClick={handleResetPassword} disabled={saving} className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2">
                   {saving ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />Enviando...</> : <><Key className="w-4 h-4" />Redefinir Senha</>}
                 </button>
@@ -664,16 +608,12 @@ const UsersManager: React.FC = () => {
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowBulkDeleteModal(false)} />
           <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl animate-[modalSlideUp_0.3s_ease]">
             <div className="p-6 text-center">
-              <div className="w-16 h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4">
-                <AlertTriangle className="w-8 h-8 text-red-500" />
-              </div>
+              <div className="w-16 h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Excluir Usuários</h3>
               <p className="text-gray-600">Tem certeza que deseja excluir <strong>{selectedUsers.size}</strong> usuário{selectedUsers.size > 1 ? 's' : ''}?</p>
               <p className="text-sm text-red-500 mt-1">Esta ação não pode ser desfeita.</p>
               <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <button onClick={() => setShowBulkDeleteModal(false)} disabled={deleting} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50">
-                  Cancelar
-                </button>
+                <button onClick={() => setShowBulkDeleteModal(false)} disabled={deleting} className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50">Cancelar</button>
                 <button onClick={executeBulkDelete} disabled={deleting} className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2">
                   {deleting ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />Excluindo...</> : <><Trash2 className="w-4 h-4" />Excluir {selectedUsers.size}</>}
                 </button>
