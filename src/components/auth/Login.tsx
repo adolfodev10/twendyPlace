@@ -54,16 +54,13 @@ const Login: React.FC = () => {
     checkLockout();
   }, []);
 
-  // ✅ Redirecionar se já estiver logado
   useEffect(() => {
     if (user) {
       navigate(user.role === 'admin' ? '/admin' : '/', { replace: true });
     }
   }, [user, navigate]);
 
-  console.log("User: ", user);
 
-  // ✅ Timer de bloqueio
   useEffect(() => {
     if (!isLocked) return;
 

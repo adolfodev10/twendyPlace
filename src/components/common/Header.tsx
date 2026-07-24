@@ -11,6 +11,44 @@ interface HeaderProps {
   user: UserType | null;
 }
 
+// ✅ Função para obter iniciais
+const getInitials = (user: UserType): string => {
+  if (user.name && user.name.trim()) {
+    return user.name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  }
+  return user.email?.split('@')[0].slice(0, 2).toUpperCase() || 'U';
+};
+
+// ✅ Componente Avatar
+const UserAvatar: React.FC<{ user: UserType }> = ({ user }) => {
+  const [imgError, setImgError] = useState(false);
+
+  if (user.avatar && !imgError) {
+    return (
+      <img
+        src={user.avatar}
+        alt={user.name || 'Usuário'}
+        className="w-8 h-8 rounded-full object-cover"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  // Círculo azul com iniciais
+  return (
+    <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
+      <span className="text-white font-bold text-sm">
+        {getInitials(user)}
+      </span>
+    </div>
+  );
+};
+
 const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
@@ -36,19 +74,13 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
 
           <div className="hidden md:flex items-center gap-4">
             {user?.role === 'admin' && (
-              <Link
-                to="/admin"
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg transition-colors"
-              >
+              <Link to="/admin" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg transition-colors">
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard
               </Link>
             )}
 
-            <button
-              onClick={onCartClick}
-              className="relative p-2 text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg transition-colors"
-            >
+            <button onClick={onCartClick} className="relative p-2 text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg transition-colors">
               <ShoppingCart className="w-5 h-5" />
               {cartCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
@@ -63,30 +95,21 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
                   onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg transition-colors"
                 >
-                  <img
-                    src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=2563eb&color=fff`}
-                    alt={user.name}
-                    className="w-8 h-8 rounded-full"
-                  />
-                  <span className="hidden lg:inline">{user.name}</span>
+                  {/* ✅ Avatar com fallback */}
+                  <UserAvatar user={user} />
+                  <span className="hidden lg:inline">
+                    {user.name || user.email?.split('@')[0] || 'Usuário'}
+                  </span>
                 </button>
 
                 {isUserDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-
-                    <Link
-                      to="/my-orders"
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setIsUserDropdownOpen(false)}
-                    >
+                    <Link to="/my-orders" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setIsUserDropdownOpen(false)}>
                       <ShoppingCart className="w-4 h-4" />
                       Meus Pedidos
                     </Link>
                     <hr className="my-1" />
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
-                    >
+                    <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full">
                       <LogOut className="w-4 h-4" />
                       Sair
                     </button>
@@ -94,76 +117,45 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
                 )}
               </div>
             ) : (
-              <Link
-                to="/login"
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
-              >
+              <Link to="/login" className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">
                 Entrar
               </Link>
             )}
           </div>
 
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden p-2 text-gray-700 hover:text-primary-600"
-          >
+          {/* Mobile menu button */}
+          <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="md:hidden p-2 text-gray-700 hover:text-primary-600">
             {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
+        {/* Mobile menu */}
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t border-gray-200">
             <div className="flex flex-col space-y-2">
               {user?.role === 'admin' && (
-                <Link
-                  to="/admin"
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg"
-                  onClick={() => setIsMenuOpen(false)}
-                >
+                <Link to="/admin" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>
                   <LayoutDashboard className="w-4 h-4" />
                   Dashboard
                 </Link>
               )}
-
-              <button
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  onCartClick();
-                }}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg"
-              >
+              <button onClick={() => { setIsMenuOpen(false); onCartClick(); }} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg">
                 <ShoppingCart className="w-4 h-4" />
                 Carrinho ({cartCount})
               </button>
-
               {user ? (
                 <>
-
-                  <Link
-                    to="/my-orders"
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
+                  <Link to="/my-orders" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>
                     <ShoppingCart className="w-4 h-4" />
                     Meus Pedidos
                   </Link>
-                  <button
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      handleLogout();
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg"
-                  >
+                  <button onClick={() => { setIsMenuOpen(false); handleLogout(); }} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg">
                     <LogOut className="w-4 h-4" />
                     Sair
                   </button>
                 </>
               ) : (
-                <Link
-                  to="/login"
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg text-center"
-                  onClick={() => setIsMenuOpen(false)}
-                >
+                <Link to="/login" className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg text-center" onClick={() => setIsMenuOpen(false)}>
                   Entrar
                 </Link>
               )}

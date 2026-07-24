@@ -28,8 +28,6 @@ const findUserByUid = async (uid: string): Promise<User | null> => {
 
   if (docSnap.exists()) {
     const data = docSnap.data();
-    console.log('📦 Dados brutos do Firestore:', JSON.stringify(data, null, 2)); // Debug
-    console.log("User: ", auth?.currentUser?.displayName);
 
     return {
       uid: uid,
@@ -55,11 +53,8 @@ const findUserByUid = async (uid: string): Promise<User | null> => {
   if (!snapshot.empty) {
     const docData = snapshot.docs[0];
     const data = docData.data();
-    console.log("Dados: ",data);
 
-    console.log("User: ", auth?.currentUser?.displayName);
 
-    console.log('📦 Dados brutos (query por uid):', JSON.stringify(data, null, 2));
     return {
       uid: uid,
       id: docData.id,
@@ -86,8 +81,6 @@ const findUserByUid = async (uid: string): Promise<User | null> => {
       const docData = emailSnapshot.docs[0];
       const data = docData.data();
 
-      console.log('📦 Dados brutos (query por email):', JSON.stringify(data, null, 2));
-      console.log("User: ", auth.currentUser.displayName);
 
       return {
         uid: uid,
@@ -108,7 +101,6 @@ const findUserByUid = async (uid: string): Promise<User | null> => {
   }
 
   if (auth.currentUser) {
-    console.log('⚠️ Usuário não encontrado no Firestore, usando dados do Auth');
     return {
       uid: uid,
       id: uid,
