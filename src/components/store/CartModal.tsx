@@ -102,7 +102,6 @@ const ConfirmModal: React.FC<{
                   </button>
                 </div>
 
-                {/* Nome (não editável) */}
                 <div className="space-y-3">
                   <div className="flex items-start gap-2">
                     <Mail className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
@@ -137,7 +136,6 @@ const ConfirmModal: React.FC<{
                     </div>
                   </div>
 
-                  {/* ✅ Morada - EDITÁVEL */}
                   <div className="flex items-start gap-2">
                     <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -226,7 +224,6 @@ const ConfirmModal: React.FC<{
               </div>
             </div>
 
-            {/* Instruções */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 text-left">
               <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-yellow-600" /> Instruções
@@ -239,7 +236,6 @@ const ConfirmModal: React.FC<{
               </ol>
             </div>
 
-            {/* Upload (mantido igual) */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2 text-left">
                 Comprovativo de Pagamento *
