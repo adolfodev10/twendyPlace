@@ -311,8 +311,6 @@ const ConfirmModal: React.FC<{
     );
   };
 
-ConfirmModal.displayName = 'ConfirmModal';
-
 const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
   const { items, removeItem, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
   const { user } = useAuth();
