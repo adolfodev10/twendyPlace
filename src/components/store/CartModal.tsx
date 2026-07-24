@@ -36,6 +36,9 @@ const ConfirmModal: React.FC<{
   isOpen, onClose, onConfirm, total, items, loading, onFileUpload,
   uploadedFile, isUploading, uploadedFileURL, userData
 }) => {
+
+  console.log(userData);
+
     if (!isOpen) return null;
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -326,7 +329,7 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   const userData = user ? {
-    name: user.name || 'Cliente',
+    name: user.name || user?.email?.split('@')[0] || 'Cliente',
     email: user.email || '',
     phone: user.phone || '',
     address: user.address || '',
