@@ -51,11 +51,9 @@ export const AdminNotificationProvider: React.FC<{ children: React.ReactNode }> 
 
     const isAdmin = user?.role === 'admin';
 
-    // Listener para pedidos pendentes - SEM orderBy para evitar erro de índice
     useEffect(() => {
         if (!isAdmin) return;
 
-        // 🔥 Usar consulta SEM orderBy - funciona sem índice composto
         const ordersQuery = query(
             collection(db, 'orders'),
             where('status', '==', 'awaiting_payment')

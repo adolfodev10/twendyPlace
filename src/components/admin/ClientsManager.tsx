@@ -10,7 +10,6 @@ const ClientsManager: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // 🔥 NOVO: Estados para seleção múltipla
   const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -45,7 +44,6 @@ const ClientsManager: React.FC = () => {
     }
   };
 
-  // 🔥 Filtrar clientes com useMemo
   const filteredClients = useMemo(() => {
     return clients.filter(client =>
       client.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -55,7 +53,6 @@ const ClientsManager: React.FC = () => {
     );
   }, [clients, search]);
 
-  // 🔥 NOVO: Funções de seleção
   const toggleClientSelection = (clientId: string) => {
     setSelectedClients(prev => {
       const newSelected = new Set(prev);
@@ -79,7 +76,6 @@ const ClientsManager: React.FC = () => {
     }
   };
 
-  // Sincronizar selectAll
   useEffect(() => {
     if (filteredClients.length > 0) {
       setSelectAll(selectedClients.size === filteredClients.length);
@@ -88,7 +84,6 @@ const ClientsManager: React.FC = () => {
     }
   }, [selectedClients, filteredClients]);
 
-  // 🔥 NOVO: Abrir modal de exclusão em massa
   const openBulkDeleteModal = () => {
     if (selectedClients.size === 0) {
       toast.error('Selecione pelo menos um cliente para excluir');
@@ -97,7 +92,6 @@ const ClientsManager: React.FC = () => {
     setShowBulkDeleteModal(true);
   };
 
-  // 🔥 NOVO: Executar exclusão em massa
   const executeBulkDelete = async () => {
     if (selectedClients.size === 0) return;
 
@@ -108,7 +102,6 @@ const ClientsManager: React.FC = () => {
     try {
       const clientIds = Array.from(selectedClients);
 
-      // Processar em lotes de 10
       const batchSize = 10;
 
       for (let i = 0; i < clientIds.length; i += batchSize) {
@@ -144,7 +137,6 @@ const ClientsManager: React.FC = () => {
     }
   };
 
-  // 🔥 NOVO: Exportar clientes selecionados para CSV
   const exportSelectedToCSV = () => {
     const clientsToExport = selectedClients.size > 0
       ? filteredClients.filter(c => selectedClients.has(c.uid))

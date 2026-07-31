@@ -15,7 +15,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products }) => {
 
   const isAdmin = user?.role === 'admin';
 
-  // 🔥 FILTRAR PRODUTOS COM ESTOQUE > 0 (para clientes)
   const availableProducts = isAdmin
     ? products
     : products.filter(p => p.stock > 0);

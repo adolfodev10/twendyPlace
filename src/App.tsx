@@ -5,7 +5,6 @@ import { CartProvider } from './contexts/CartContext';
 import { AdminNotificationProvider } from './contexts/AdminNotificationContext';
 import AdminNotificationBell from './components/AdminNotificationBell';
 
-// Pages
 import Store from './pages/Store';
 import AdminDashboard from './pages/AdminDashboard';
 import Login from './components/auth/Login';
@@ -15,7 +14,6 @@ import OrderConfirmation from './pages/OrderConfirmation';
 import Profile from './pages/Profile';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
-// Componente de Layout com Header
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const location = useLocation();

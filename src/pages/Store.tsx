@@ -34,21 +34,17 @@ const Store: React.FC = () => {
       setError(null);
 
       try {
-        // 🔥 BUSCAR PRODUTOS NORMAIS E DE PARCEIROS
         const [normalProducts, partnerProducts] = await Promise.all([
           productService.getAllProducts(),
           partnerService.getPartnerProductsForStore()
         ]);
 
-        // 🔥 COMBINAR PRODUTOS
         let allProducts = [...normalProducts, ...partnerProducts];
 
-        // 🔥 REMOVER DUPLICATAS (por nome)
         const uniqueProducts = allProducts.filter((product, index, self) =>
           index === self.findIndex(p => p.name === product.name)
         );
 
-        // 🔥 ORDENAR POR NOME
         uniqueProducts.sort((a, b) => a.name.localeCompare(b.name));
 
         setProducts(uniqueProducts);

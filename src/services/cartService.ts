@@ -299,12 +299,10 @@ export const cartService = {
     ): Promise<{ success: boolean; error?: string }> {
 
         try {
-            // 🔥 1. VERIFICAR SE O DOCUMENTO EXISTE PRIMEIRO
             const orderRef = doc(db, 'orders', orderId);
 
             const orderSnap = await getDoc(orderRef);
 
-            // 🔥 2. SE NÃO EXISTIR, RETORNAR ERRO
             if (!orderSnap.exists()) {
                 console.error(`❌ [updateOrderStatus] Pedido não encontrado: ${orderId}`);
                 return { success: false, error: 'Pedido não encontrado' };
@@ -312,7 +310,6 @@ export const cartService = {
 
             const orderData = orderSnap.data();
 
-            // 🔥 3. VALIDAÇÕES
             if (newStatus === 'paid' && !orderData.paymentProof) {
                 console.error(`❌ [updateOrderStatus] Comprovativo não enviado`);
                 return { success: false, error: 'Cliente não enviou comprovativo de pagamento' };
@@ -320,7 +317,6 @@ export const cartService = {
 
             const now = new Date().toISOString();
 
-            // 🔥 4. PREPARAR DADOS PARA ATUALIZAÇÃO
             const validationEntry = {
                 validatedAt: now,
                 validatedBy: validatedBy || 'unknown',
@@ -339,7 +335,6 @@ export const cartService = {
             };
 
 
-            // 🔥 5. ATUALIZAR O DOCUMENTO
             await updateDoc(orderRef, updateData);
 
             return { success: true };

@@ -48,12 +48,10 @@ const LOCKOUT_DURATION_MINUTES = 15;
 
 export const authService = {
 
-  // 🔥 Buscar usuário atual
   getCurrentUser(): any {
     return auth.currentUser;
   },
 
-  // 🔥 Buscar papel do usuário
   async getUserRole(uid: string): Promise<string> {
     try {
       const userDoc = await getDoc(doc(db, 'users', uid));

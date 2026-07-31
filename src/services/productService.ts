@@ -34,10 +34,8 @@ export const productService = {
         ...doc.data() as Omit<Product, 'id'>,
       }));
 
-      // 🔥 FILTRAR APENAS PRODUTOS COM STOCK > 0
       const availableProducts = allProducts.filter(product => product.stock > 0);
 
-      // 🔥 REMOVER DUPLICATAS (mesmo nome)
       const uniqueProducts = availableProducts.filter((product, index, self) =>
         index === self.findIndex(p => p.name === product.name)
       );

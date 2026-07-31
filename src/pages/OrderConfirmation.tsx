@@ -27,7 +27,6 @@ const OrderConfirmation: React.FC = () => {
 
     setLoading(true);
 
-    // 🔥 LISTENER EM TEMPO REAL para o pedido
     const unsubscribe = cartService.onOrderById(
       orderId,
       (updatedOrder) => {

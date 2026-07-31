@@ -67,7 +67,6 @@ export const partnerService = {
                 ...doc.data() as Omit<Partner, 'id'>,
             }));
         } catch (error: any) {
-            // 🔥 FALLBACK: Se o índice estiver em construção, buscar sem orderBy
             if (error.message?.includes('index is currently building')) {
 
                 try {
@@ -85,7 +84,6 @@ export const partnerService = {
                         ...doc.data() as Omit<Partner, 'id'>,
                     }));
 
-                    // Ordenar no cliente
                     partners.sort((a, b) => a.name.localeCompare(b.name));
 
                     return partners;
@@ -100,9 +98,7 @@ export const partnerService = {
         }
     },
 
-    /**
-     * 🔥 BUSCAR PARCEIRO POR ID
-     */
+
     async getPartnerById(id: string): Promise<Partner | null> {
         try {
             const docRef = doc(db, 'partners', id);
@@ -120,9 +116,7 @@ export const partnerService = {
         }
     },
 
-    /**
-     * 🔥 ATUALIZAR PARCEIRO
-     */
+
     async updatePartner(id: string, data: Partial<Omit<Partner, 'id'>>): Promise<{ success: boolean; error?: string }> {
         try {
             await updateDoc(doc(db, 'partners', id), {
@@ -136,9 +130,6 @@ export const partnerService = {
         }
     },
 
-    /**
-     * 🔥 DELETAR PARCEIRO
-     */
     async deletePartner(id: string): Promise<{ success: boolean; error?: string }> {
         try {
             await deleteDoc(doc(db, 'partners', id));
@@ -149,9 +140,6 @@ export const partnerService = {
         }
     },
 
-    /**
-     * 🔥 ADICIONAR PRODUTO AO PARCEIRO
-     */
     async addProductToPartner(
         partnerId: string,
         productId: string,
@@ -173,7 +161,6 @@ export const partnerService = {
                 return { success: false, error: 'Parceiro não encontrado' };
             }
 
-            // Calcular comissão
             const commission = (partnerPrice * commissionRate) / 100;
 
             const partnerProductData = {
@@ -190,10 +177,8 @@ export const partnerService = {
                 updatedAt: serverTimestamp(),
             };
 
-            // Adicionar à subcoleção partnerProducts
             const docRef = await addDoc(collection(db, 'partners', partnerId, 'products'), partnerProductData);
 
-            // Atualizar contagem de produtos do parceiro
             await updateDoc(doc(db, 'partners', partnerId), {
                 totalProducts: increment(1),
                 products: arrayUnion(productId),
@@ -207,9 +192,7 @@ export const partnerService = {
         }
     },
 
-    /**
-     * 🔥 BUSCAR PRODUTOS DO PARCEIRO
-     */
+ 
     async getPartnerProducts(partnerId: string): Promise<PartnerProduct[]> {
         try {
             const q = query(
@@ -227,9 +210,7 @@ export const partnerService = {
         }
     },
 
-    /**
-     * 🔥 REMOVER PRODUTO DO PARCEIRO
-     */
+   
     async removeProductFromPartner(partnerId: string, productId: string): Promise<{ success: boolean; error?: string }> {
         try {
             await deleteDoc(doc(db, 'partners', partnerId, 'products', productId));
@@ -239,7 +220,6 @@ export const partnerService = {
                 updatedAt: serverTimestamp(),
             });
 
-            // Remover productId do array products
             const partnerDoc = await getDoc(doc(db, 'partners', partnerId));
             if (partnerDoc.exists()) {
                 const data = partnerDoc.data();
@@ -257,9 +237,7 @@ export const partnerService = {
         }
     },
 
-    /**
-     * 🔥 REGISTRAR COMISSÃO DE VENDA
-     */
+    
     async registerCommission(
         partnerId: string,
         orderId: string,
@@ -289,7 +267,6 @@ export const partnerService = {
 
             const docRef = await addDoc(collection(db, 'partnerCommissions'), commissionData);
 
-            // Atualizar totais do parceiro
             await updateDoc(doc(db, 'partners', partnerId), {
                 totalSales: increment(salePrice * quantity),
                 totalCommission: increment(commissionValue * quantity),
@@ -303,9 +280,7 @@ export const partnerService = {
         }
     },
 
-    /**
-     * 🔥 CRIAR PRODUTO DIRETAMENTE PARA UM PARCEIRO
-     */
+    
     async createPartnerProduct(
         partnerId: string,
         productData: {
@@ -322,7 +297,6 @@ export const partnerService = {
         }
     ): Promise<{ success: boolean; productId?: string; error?: string }> {
         try {
-            // 1. Criar o produto na coleção principal
             const { productService } = await import('./productService');
 
             const newProduct = {
@@ -347,7 +321,6 @@ export const partnerService = {
                 return { success: false, error: result.error || 'Erro ao criar produto' };
             }
 
-            // 2. Associar ao parceiro
             await this.addProductToPartner(
                 partnerId,
                 result.id,
@@ -366,19 +339,16 @@ export const partnerService = {
      */
     async getPartnerProductsForStore(): Promise<any[]> {
         try {
-            // 🔥 Buscar apenas produtos de parceiros
             const q = query(
                 collection(db, 'products'),
                 where('isPartnerProduct', '==', true)
             );
             const snapshot = await getDocs(q);
 
-            // 🔥 Mapear produtos com a estrutura correta para a loja
             let products = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
                 const data = doc.data();
                 return {
                     id: doc.id,
-                    // 🔥 IMPORTANTE: Usar 'name' que existe no produto
                     name: data.name || data.productName || 'Produto sem nome',
                     price: data.partnerPrice || data.price || 0,
                     stock: data.stock || 0,
@@ -387,7 +357,6 @@ export const partnerService = {
                     rating: data.rating || 0,
                     image: data.image || '',
                     description: data.description || '',
-                    // 🔥 Campos de parceiro
                     isPartnerProduct: true,
                     partnerId: data.partnerId,
                     partnerPrice: data.partnerPrice,
@@ -396,10 +365,8 @@ export const partnerService = {
                 };
             });
 
-            // 🔥 Filtrar produtos com estoque disponível
             products = products.filter((p: any) => (p.stock ?? 0) > 0);
 
-            // 🔥 Ordenar por nome
             products.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
             return products;
@@ -409,9 +376,6 @@ export const partnerService = {
         }
     },
 
-    /**
-     * 🔥 CALCULAR COMISSÃO DE UMA VENDA DE PARCEIRO
-     */
     async calculatePartnerCommission(
         productId: string,
         salePrice: number,
@@ -467,7 +431,6 @@ export const partnerService = {
                     callback(partners);
                 },
                 (error) => {
-                    // 🔥 Se o índice estiver em construção, tentar sem orderBy
                     if (error.message?.includes('index is currently building')) {
 
                         try {

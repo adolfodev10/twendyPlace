@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// 🔥 Componente de Skeleton Loading
 const OrderSkeleton: React.FC = () => {
     return (
         <div className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
@@ -235,7 +234,6 @@ const MyOrders: React.FC = () => {
         toast.success('Todas as notificações marcadas como lidas');
     };
 
-    // 🔥 Filtrar pedidos por status
     const filteredOrders = statusFilter === 'all' 
         ? orders 
         : orders.filter(order => order.status === statusFilter);
