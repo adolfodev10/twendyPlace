@@ -1,5 +1,5 @@
 // src/contexts/AdminNotificationContext.tsx
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
     collection,
     query,
@@ -11,7 +11,6 @@ import {
 import { db } from '../services/firebase';
 import { notificationService } from '../services/notificationService';
 import { useAuth } from './AuthContext';
-import toast from 'react-hot-toast';
 
 interface AdminNotification {
     id: string;
@@ -48,54 +47,53 @@ export const AdminNotificationProvider: React.FC<{ children: React.ReactNode }> 
     const { user } = useAuth();
     const [notifications, setNotifications] = useState<AdminNotification[]>([]);
     const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
-    const [hasIndexError, setHasIndexError] = useState(false);
+    const previousOrdersRef = useRef<Set<string>>(new Set());
 
     const isAdmin = user?.role === 'admin';
 
-    // Listener para pedidos pendentes
+    // Listener para pedidos pendentes - SEM orderBy para evitar erro de índice
     useEffect(() => {
         if (!isAdmin) return;
 
-        let ordersQuery;
-
-        if (hasIndexError) {
-            // Consulta sem orderBy
-            ordersQuery = query(
-                collection(db, 'orders'),
-                where('status', '==', 'awaiting_payment')
-            );
-        } else {
-            // Consulta com orderBy
-            ordersQuery = query(
-                collection(db, 'orders'),
-                where('status', '==', 'awaiting_payment'),
-                orderBy('createdAt', 'desc')
-            );
-        }
+        // 🔥 Usar consulta SEM orderBy - funciona sem índice composto
+        const ordersQuery = query(
+            collection(db, 'orders'),
+            where('status', '==', 'awaiting_payment')
+        );
 
         const unsubscribe = onSnapshot(ordersQuery,
             (snapshot) => {
+                const currentIds = new Set<string>();
+
+                snapshot.forEach((doc) => {
+                    currentIds.add(doc.id);
+                });
+
                 setPendingOrdersCount(snapshot.size);
+
+                // Detectar novos pedidos (para log)
+                if (previousOrdersRef.current.size > 0) {
+                    const newIds = [...currentIds].filter(id => !previousOrdersRef.current.has(id));
+                    if (newIds.length > 0) {
+                        console.log(`🆕 ${newIds.length} novo(s) pedido(s) pendente(s)`);
+                    }
+                }
+
+                previousOrdersRef.current = currentIds;
             },
             (error) => {
                 console.error('Erro no listener de pedidos:', error);
-                if (error.code === 'failed-precondition' || error.message?.includes('index')) {
-                    setHasIndexError(true);
-                    toast.error(
-                        'Índice do Firestore necessário. Usando modo alternativo.',
-                        { duration: 5000 }
-                    );
-                }
             }
         );
 
         return () => unsubscribe();
-    }, [isAdmin, hasIndexError]);
+    }, [isAdmin]);
 
     // Listener para notificações do admin
     useEffect(() => {
         if (!isAdmin) return;
 
+        // Para adminNotifications também usamos sem orderBy se der erro
         const notificationsQuery = query(
             collection(db, 'adminNotifications'),
             orderBy('createdAt', 'desc'),
