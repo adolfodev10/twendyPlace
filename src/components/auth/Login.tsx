@@ -5,11 +5,6 @@ import { authService } from '../../services/authService';
 import toast from 'react-hot-toast';
 import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 
-const LOCKOUT_KEY = 'login_lockout_until';
-const ATTEMPTS_KEY = 'login_attempts';
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MINUTES = 5;
-
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -17,87 +12,86 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [loginAttempts, setLoginAttempts] = useState(() => {
-    const saved = localStorage.getItem(ATTEMPTS_KEY);
-    return saved ? parseInt(saved, 10) : 0;
-  });
   const [isLocked, setIsLocked] = useState(false);
   const [remainingTime, setRemainingTime] = useState(0);
+  const [countdownInterval, setCountdownInterval] = useState<ReturnType<typeof setInterval> | null>(null);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
   };
 
-  // ✅ Verificar bloqueio ao iniciar
+  if (user) {
+    navigate(user.role === 'admin' ? '/admin' : '/', { replace: true });
+  }
+
   useEffect(() => {
-    const checkLockout = () => {
-      const lockoutUntil = localStorage.getItem(LOCKOUT_KEY);
-      if (lockoutUntil) {
-        const lockDate = new Date(lockoutUntil);
-        const now = new Date();
-        if (lockDate > now) {
-          setIsLocked(true);
-          const diffMs = lockDate.getTime() - now.getTime();
-          setRemainingTime(Math.ceil(diffMs / 60000));
-          return true;
-        } else {
-          localStorage.removeItem(LOCKOUT_KEY);
-          localStorage.removeItem(ATTEMPTS_KEY);
-          setIsLocked(false);
-          setLoginAttempts(0);
-          setRemainingTime(0);
+    return () => {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+      }
+    };
+  }, [countdownInterval]);
+
+  // Verificar status de bloqueio quando o email mudar
+  useEffect(() => {
+    const checkLockStatus = async () => {
+      if (email && validateEmail(email)) {
+        try {
+          const status = await authService.checkLockStatus(email);
+          if (status.isLocked) {
+            setIsLocked(true);
+            setRemainingTime(status.remainingMinutes || 0);
+            startCountdown(status.remainingMinutes || 0);
+          } else {
+            setIsLocked(false);
+            setRemainingTime(0);
+            if (countdownInterval) {
+              clearInterval(countdownInterval);
+              setCountdownInterval(null);
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao verificar status de bloqueio:', error);
         }
       }
-      return false;
     };
-    checkLockout();
-  }, []);
 
-  useEffect(() => {
-    if (user) {
-      navigate(user.role === 'admin' ? '/admin' : '/', { replace: true });
+    const debounceTimer = setTimeout(() => {
+      checkLockStatus();
+    }, 500); // Debounce de 500ms
+
+    return () => clearTimeout(debounceTimer);
+  }, [email]);
+
+  const startCountdown = (minutes: number) => {
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
     }
-  }, [user, navigate]);
 
+    let remainingSeconds = minutes * 60;
 
-  useEffect(() => {
-    if (!isLocked) return;
+    const interval = setInterval(() => {
+      remainingSeconds--;
 
-    const timer = setInterval(() => {
-      const lockoutUntil = localStorage.getItem(LOCKOUT_KEY);
-      if (lockoutUntil) {
-        const lockDate = new Date(lockoutUntil);
-        const now = new Date();
-        const diffMs = lockDate.getTime() - now.getTime();
-        const diffMin = Math.ceil(diffMs / 60000);
-
-        if (diffMin <= 0) {
-          localStorage.removeItem(LOCKOUT_KEY);
-          localStorage.removeItem(ATTEMPTS_KEY);
-          setIsLocked(false);
-          setLoginAttempts(0);
-          setRemainingTime(0);
-        } else {
-          setRemainingTime(diffMin);
-        }
+      if (remainingSeconds <= 0) {
+        clearInterval(interval);
+        setIsLocked(false);
+        setRemainingTime(0);
+        setCountdownInterval(null);
+      } else {
+        setRemainingTime(Math.ceil(remainingSeconds / 60));
       }
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [isLocked]);
+    setCountdownInterval(interval);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Verificar bloqueio
     if (isLocked) {
       toast.error(`Conta bloqueada. Aguarde ${remainingTime} minuto${remainingTime !== 1 ? 's' : ''}.`);
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      toast.error('Por favor, insira um email válido');
       return;
     }
 
@@ -106,21 +100,29 @@ const Login: React.FC = () => {
       return;
     }
 
+    if (!validateEmail(email)) {
+      toast.error('Por favor, insira um email válido');
+      return;
+    }
+
     setLoading(true);
+
     try {
       const result = await authService.login(email, password);
 
       if (result.success) {
-        // Limpar bloqueio
-        localStorage.removeItem(ATTEMPTS_KEY);
-        localStorage.removeItem(LOCKOUT_KEY);
-        setLoginAttempts(0);
+        // Login bem sucedido
         setIsLocked(false);
+        setRemainingTime(0);
+        if (countdownInterval) {
+          clearInterval(countdownInterval);
+          setCountdownInterval(null);
+        }
+
         toast.success('Login realizado com sucesso!');
 
         const userRole = result?.user?.role || "customer";
 
-        // Redirecionar baseado no role
         setTimeout(() => {
           if (userRole === 'admin' || userRole === 'administrador') {
             navigate('/admin', { replace: true });
@@ -129,28 +131,27 @@ const Login: React.FC = () => {
           }
         }, 500);
       } else {
-        const newAttempts = loginAttempts + 1;
-        setLoginAttempts(newAttempts);
-        localStorage.setItem(ATTEMPTS_KEY, String(newAttempts));
-
-        if (newAttempts >= MAX_ATTEMPTS) {
-          const lockUntil = new Date();
-          lockUntil.setMinutes(lockUntil.getMinutes() + LOCKOUT_MINUTES);
-          localStorage.setItem(LOCKOUT_KEY, lockUntil.toISOString());
+        // Tratar diferentes cenários de erro
+        if (result.isLocked) {
           setIsLocked(true);
-          setRemainingTime(LOCKOUT_MINUTES);
-          toast.error(`Muitas tentativas. Aguarde ${LOCKOUT_MINUTES} minutos.`);
+          const lockMinutes = result.remainingMinutes || 15;
+          setRemainingTime(lockMinutes);
+          startCountdown(lockMinutes);
+          toast.error(`Conta bloqueada. Aguarde ${lockMinutes} minutos.`);
+        } else if (result.remainingAttempts !== undefined && result.remainingAttempts > 0) {
+          toast.error(
+            `${result.error || 'Credenciais inválidas'} (${result.remainingAttempts} tentativa${result.remainingAttempts !== 1 ? 's' : ''} restante${result.remainingAttempts !== 1 ? 's' : ''})`
+          );
         } else {
-          const remainingAttempts = MAX_ATTEMPTS - newAttempts;
-          toast.error(`${result.error || 'Credenciais inválidas'} (${remainingAttempts} tentativa${remainingAttempts !== 1 ? 's' : ''} restante${remainingAttempts !== 1 ? 's' : ''})`);
+          toast.error(result.error || 'Erro ao fazer login. Tente novamente.');
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Erro no login:', error);
       toast.error('Erro ao fazer login. Tente novamente.');
     } finally {
       setLoading(false);
     }
-
   };
 
   return (
@@ -173,7 +174,7 @@ const Login: React.FC = () => {
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
               <p className="text-sm text-red-600 font-medium">
-                Conta bloqueada. Aguarde {remainingTime} minuto{remainingTime !== 1 ? 's' : ''}.
+                Conta temporariamente bloqueada. Aguarde {remainingTime} minuto{remainingTime !== 1 ? 's' : ''}.
               </p>
             </div>
           )}
@@ -263,7 +264,7 @@ const Login: React.FC = () => {
               ) : isLocked ? (
                 <span className="flex items-center">
                   <AlertCircle className="w-4 h-4 mr-2" />
-                  Bloqueado
+                  Bloqueado ({remainingTime}min)
                 </span>
               ) : (
                 <span className="flex items-center">

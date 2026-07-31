@@ -20,7 +20,6 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-// ✅ Função auxiliar para buscar usuário por uid (Firebase Auth)
 const findUserByUid = async (uid: string): Promise<User | null> => {
   // Tentativa 1: Buscar documento com ID = uid
   const docRef = doc(db, 'users', uid);

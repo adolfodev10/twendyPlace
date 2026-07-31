@@ -87,6 +87,7 @@ export interface Product {
   updatedAt?: Date;
 }
 
+
 export interface CartItem extends Product {
   qty: number;
 }
