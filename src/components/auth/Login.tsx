@@ -7,7 +7,7 @@ import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,10 +21,15 @@ const Login: React.FC = () => {
     return re.test(email);
   };
 
-  if (user) {
-    navigate(user.role === 'admin' ? '/admin' : '/', { replace: true });
-  }
+  // ✅ CORRETO: Redirecionar usando useEffect
+  useEffect(() => {
+    if (!authLoading && user) {
+      const destination = user.role === 'admin' ? '/admin' : '/';
+      navigate(destination, { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
+  // Limpar intervalo ao desmontar
   useEffect(() => {
     return () => {
       if (countdownInterval) {
@@ -59,7 +64,7 @@ const Login: React.FC = () => {
 
     const debounceTimer = setTimeout(() => {
       checkLockStatus();
-    }, 500); // Debounce de 500ms
+    }, 500);
 
     return () => clearTimeout(debounceTimer);
   }, [email]);
@@ -111,7 +116,6 @@ const Login: React.FC = () => {
       const result = await authService.login(email, password);
 
       if (result.success) {
-        // Login bem sucedido
         setIsLocked(false);
         setRemainingTime(0);
         if (countdownInterval) {
@@ -120,18 +124,10 @@ const Login: React.FC = () => {
         }
 
         toast.success('Login realizado com sucesso!');
-
-        const userRole = result?.user?.role || "customer";
-
-        setTimeout(() => {
-          if (userRole === 'admin' || userRole === 'administrador') {
-            navigate('/admin', { replace: true });
-          } else {
-            navigate('/', { replace: true });
-          }
-        }, 500);
+        
+        // O redirecionamento será feito automaticamente pelo useEffect
+        // quando o usuário for atualizado no AuthContext
       } else {
-        // Tratar diferentes cenários de erro
         if (result.isLocked) {
           setIsLocked(true);
           const lockMinutes = result.remainingMinutes || 15;
@@ -153,6 +149,20 @@ const Login: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // ✅ CORRETO: Mostrar loading enquanto verifica autenticação
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  // ✅ CORRETO: Não renderizar formulário se já estiver autenticado
+  if (user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
