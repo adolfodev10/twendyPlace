@@ -3,13 +3,7 @@ import { cartService } from '../../services/cartService';
 import { Order } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-    Search,
-    RefreshCw,
-    Bell,
     Package,
-    User,
-    Calendar,
-    DollarSign,
     AlertCircle,
     CheckCircle,
     Clock,
@@ -18,15 +12,21 @@ import {
     Send,
     Loader2,
     AlertTriangle,
-    Eye,
     FileImage,
     Download,
     X,
     Shield,
     Check,
     Trash2,
+    Bell,
+    RefreshCw,
+    Search,
     CheckSquare,
-    Square
+    Square,
+    User,
+    Calendar,
+    DollarSign,
+    Eye,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -41,6 +41,7 @@ import {
     writeBatch
 } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { notificationService } from '../../services/notificationService';
 
 // Configuração de transições de status permitidas
 const STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -201,7 +202,7 @@ const BulkDeleteConfirmModal: React.FC<{
                         Tem certeza que deseja eliminar <strong>{selectedCount}</strong> pedido{selectedCount > 1 ? 's' : ''} selecionado{selectedCount > 1 ? 's' : ''}?
                     </p>
                     <p className="text-sm text-red-500 mt-1">Esta ação não pode ser desfeita.</p>
-                    
+
                     <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                         <p className="text-xs text-gray-500">
                             Apenas pedidos <span className="font-semibold text-red-600">Cancelados</span> ou <span className="font-semibold text-green-600">Entregues</span> podem ser eliminados.
@@ -307,13 +308,53 @@ const OrdersManager: React.FC = () => {
     const prevOrdersRef = useRef<Order[]>([]);
 
     const checkForNewOrders = (newOrders: Order[]) => {
+        // Verificar novos pedidos (aumento na quantidade)
         if (prevOrdersRef.current.length > 0 && newOrders.length > prevOrdersRef.current.length) {
-            const newOrder = newOrders[0];
-            toast.success(`Novo pedido #${newOrder.orderNumber} recebido!`, {
-                duration: 5000,
-                icon: <Package className="w-5 h-5" />,
+            const prevIds = new Set(prevOrdersRef.current.map(o => o.id));
+            const newOrdersList = newOrders.filter(o => !prevIds.has(o.id));
+
+            newOrdersList.forEach(newOrder => {
+                // Mostrar toast
+                toast.success(`🛍️ Novo pedido #${newOrder.orderNumber} recebido!`, {
+                    duration: 8000,
+                    icon: <Package className="w-5 h-5 text-green-500" />,
+                });
+
+                // Salvar notificação para o admin
+                notificationService.saveAdminNotification({
+                    orderId: newOrder.id,
+                    orderNumber: newOrder.orderNumber || newOrder.id.slice(-8),
+                    message: `Novo pedido #${newOrder.orderNumber} de ${newOrder.customer?.name || 'Cliente'} - Kz ${newOrder.total?.toFixed(2)}`,
+                    type: 'new_order',
+                    status: newOrder.status,
+                });
             });
         }
+
+        // Verificar comprovativos enviados (paymentProof adicionado)
+        if (prevOrdersRef.current.length > 0) {
+            prevOrdersRef.current.forEach(prevOrder => {
+                const currentOrder = newOrders.find(o => o.id === prevOrder.id);
+
+                // Se antes não tinha comprovativo e agora tem
+                if (currentOrder && !prevOrder.paymentProof && currentOrder.paymentProof) {
+                    toast.success(`📎 Comprovativo enviado - Pedido #${currentOrder.orderNumber}`, {
+                        duration: 6000,
+                        icon: <FileImage className="w-5 h-5 text-blue-500" />,
+                    });
+
+                    // Salvar notificação de comprovativo
+                    notificationService.saveAdminNotification({
+                        orderId: currentOrder.id,
+                        orderNumber: currentOrder.orderNumber || currentOrder.id.slice(-8),
+                        message: `Comprovativo de pagamento enviado para o pedido #${currentOrder.orderNumber}`,
+                        type: 'payment_proof',
+                        status: currentOrder.status,
+                    });
+                }
+            });
+        }
+
         prevOrdersRef.current = newOrders;
     };
 
@@ -332,7 +373,7 @@ const OrdersManager: React.FC = () => {
 
     // Obter pedidos que podem ser deletados (cancelados ou entregues)
     const getDeletableOrders = useMemo(() => {
-        return filteredOrders.filter(order => 
+        return filteredOrders.filter(order =>
             order.status === 'cancelled' || order.status === 'delivered'
         );
     }, [filteredOrders]);
@@ -473,6 +514,15 @@ const OrdersManager: React.FC = () => {
                 });
             }
 
+            // Salvar notificação de mudança de status para o admin também
+            notificationService.saveAdminNotification({
+                orderId: orderId,
+                orderNumber: orderNumber || orderId.slice(-8),
+                message: `Status do pedido #${orderNumber || orderId.slice(-8)} alterado para ${STATUS_HISTORY[newStatus]?.label || newStatus}`,
+                type: 'status_change',
+                status: newStatus,
+            });
+
             toast.success(`Status atualizado para: ${STATUS_HISTORY[newStatus]?.label || newStatus}`);
 
             if (newStatus === 'paid') {
@@ -506,7 +556,7 @@ const OrdersManager: React.FC = () => {
     // Executar exclusão em massa
     const executeBulkDelete = async () => {
         if (selectedOrders.size === 0) return;
-        
+
         setDeleting(true);
         let successCount = 0;
         let errorCount = 0;
@@ -724,7 +774,6 @@ const OrdersManager: React.FC = () => {
                     </p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                    {/* Botão de exclusão em massa */}
                     {selectedOrders.size > 0 && (
                         <button
                             onClick={openBulkDeleteModal}
@@ -785,7 +834,6 @@ const OrdersManager: React.FC = () => {
                     <table className="w-full min-w-[1050px]">
                         <thead className="bg-gray-50">
                             <tr>
-                                {/* Coluna de checkbox */}
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 w-12">
                                     {hasSelectableOrders && (
                                         <button
@@ -845,7 +893,6 @@ const OrdersManager: React.FC = () => {
 
                                     return (
                                         <tr key={order.id} className={`border-b border-gray-100 transition-colors ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}>
-                                            {/* Checkbox de seleção */}
                                             <td className="py-3 px-3 sm:px-4">
                                                 {isDeletable && (
                                                     <button
@@ -951,7 +998,6 @@ const OrdersManager: React.FC = () => {
                     </table>
                 </div>
 
-                {/* Barra de status da seleção */}
                 {selectedOrders.size > 0 && (
                     <div className="bg-primary-50 border-t border-primary-200 px-4 py-3 flex items-center justify-between">
                         <p className="text-sm text-primary-700">

@@ -1,16 +1,27 @@
+import { collection, doc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import { db } from './firebase';
+
+interface AdminNotification {
+  orderId: string;
+  orderNumber: string;
+  message: string;
+  type: 'new_order' | 'payment_proof' | 'status_change';
+  status: string;
+}
+
 
 class NotificationService {
   private audioContext: AudioContext | null = null;
   private isSoundEnabled = true;
   private isInitialized = false;
-  private pendingSounds: Array<{type: 'notification' | 'success' | 'error'}> = [];
+  private pendingSounds: Array<{ type: 'notification' | 'success' | 'error' }> = [];
   private isMobile = false;
 
   constructor() {
     // Detectar se é mobile
     this.isMobile = /Android|iPhone|iPad|iPod|BlackBerry|Opera Mini|IEMobile/i.test(navigator.userAgent);
-    
+
     this.setupUserInteraction();
   }
 
@@ -20,7 +31,7 @@ class NotificationService {
         try {
           this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
           this.isInitialized = true;
-          
+
           // Tocar sons pendentes
           if (this.pendingSounds.length > 0) {
             this.pendingSounds.forEach(sound => {
@@ -57,7 +68,7 @@ class NotificationService {
         if (!this.isMobile) {
           this.audioContext.resume().then(() => {
             this.isInitialized = true;
-          }).catch(() => {});
+          }).catch(() => { });
         }
       }
     } catch (e) {
@@ -127,10 +138,10 @@ class NotificationService {
 
     try {
       const now = this.audioContext.currentTime;
-      
+
       // No mobile, usar tons mais altos e curtos
       const isMobile = this.isMobile;
-      
+
       switch (type) {
         case 'notification':
           this.playTone(isMobile ? 1000 : 800, isMobile ? 0.06 : 0.08, now);
@@ -159,20 +170,20 @@ class NotificationService {
     try {
       const oscillator = this.audioContext.createOscillator();
       const gainNode = this.audioContext.createGain();
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(this.audioContext.destination);
-      
+
       oscillator.frequency.value = frequency;
       oscillator.type = 'sine';
-      
+
       // No mobile, aumentar o volume um pouco
       const maxVolume = this.isMobile ? 0.4 : 0.3;
-      
+
       gainNode.gain.setValueAtTime(0.01, startTime);
       gainNode.gain.linearRampToValueAtTime(maxVolume, startTime + 0.01);
       gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-      
+
       oscillator.start(startTime);
       oscillator.stop(startTime + duration);
     } catch (error) {
@@ -199,8 +210,8 @@ class NotificationService {
     } = options || {};
 
     if (sound) {
-      const soundType = type === 'success' ? 'success' : 
-                       type === 'error' ? 'error' : 'notification';
+      const soundType = type === 'success' ? 'success' :
+        type === 'error' ? 'error' : 'notification';
       this.playSound(soundType);
     }
 
@@ -235,12 +246,12 @@ class NotificationService {
           (t) => {
             const container = document.createElement('div');
             container.className = `${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-yellow-50 border border-yellow-200 shadow-lg rounded-xl pointer-events-auto flex items-center gap-3 p-4`;
-            
+
             const iconSpan = document.createElement('span');
             iconSpan.className = 'text-2xl';
             iconSpan.textContent = '⚠️';
             container.appendChild(iconSpan);
-            
+
             const messageDiv = document.createElement('div');
             messageDiv.className = 'flex-1';
             const messageP = document.createElement('p');
@@ -248,7 +259,7 @@ class NotificationService {
             messageP.textContent = message;
             messageDiv.appendChild(messageP);
             container.appendChild(messageDiv);
-            
+
             const closeBtn = document.createElement('button');
             closeBtn.className = 'text-yellow-500 hover:text-yellow-700';
             closeBtn.textContent = '✕';
@@ -257,12 +268,12 @@ class NotificationService {
               toast.dismiss(t.id);
             };
             container.appendChild(closeBtn);
-            
+
             container.onclick = () => {
               toast.dismiss(t.id);
               if (onClick) onClick();
             };
-            
+
             return container as any;
           },
           { duration }
@@ -275,8 +286,108 @@ class NotificationService {
     this.sendBrowserNotification(message, { icon, onClick });
   }
 
-  private sendBrowserNotification(message: string, options?: { 
-    icon?: string; 
+  async saveAdminNotification(notification: AdminNotification) {
+    try {
+      const notifRef = doc(collection(db, 'adminNotifications'));
+      await setDoc(notifRef, {
+        ...notification,
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+      console.log('✅ Notificação admin salva:', notification.orderNumber);
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao salvar notificação admin:', error);
+      return false;
+    }
+  }
+
+   async getAdminNotifications(limitCount = 50) {
+    try {
+      const q = query(
+        collection(db, 'adminNotifications'),
+        orderBy('createdAt', 'desc'),
+        limit(limitCount)
+      );
+      
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      console.error('Erro ao buscar notificações:', error);
+      return [];
+    }
+  }
+
+    async getUnreadCount(): Promise<number> {
+    try {
+      const q = query(
+        collection(db, 'adminNotifications'),
+        where('read', '==', false)
+      );
+      
+      const snapshot = await getDocs(q);
+      return snapshot.size;
+    } catch (error) {
+      console.error('Erro ao contar notificações:', error);
+      return 0;
+    }
+  }
+
+   async markAsRead(notificationId: string) {
+    try {
+      const { doc, updateDoc } = await import('firebase/firestore');
+      await updateDoc(doc(db, 'adminNotifications', notificationId), {
+        read: true,
+      });
+      return true;
+    } catch (error) {
+      console.error('Erro ao marcar como lida:', error);
+      return false;
+    }
+  }
+
+  async markAllAsRead(notificationIds: string[]) {
+    try {
+      const { writeBatch, doc } = await import('firebase/firestore');
+      const batch = writeBatch(db);
+      
+      notificationIds.forEach(id => {
+        const notifRef = doc(db, 'adminNotifications', id);
+        batch.update(notifRef, { read: true });
+      });
+
+      await batch.commit();
+      return true;
+    } catch (error) {
+      console.error('Erro ao marcar todas como lidas:', error);
+      return false;
+    }
+  }
+
+   async clearAll(notificationIds: string[]) {
+    try {
+      const { writeBatch, doc } = await import('firebase/firestore');
+      const batch = writeBatch(db);
+      
+      notificationIds.forEach(id => {
+        const notifRef = doc(db, 'adminNotifications', id);
+        batch.delete(notifRef);
+      });
+
+      await batch.commit();
+      return true;
+    } catch (error) {
+      console.error('Erro ao limpar notificações:', error);
+      return false;
+    }
+  }
+
+
+  private sendBrowserNotification(message: string, options?: {
+    icon?: string;
     onClick?: () => void;
   }) {
     if (!('Notification' in window)) return;
@@ -310,7 +421,7 @@ class NotificationService {
           options.onClick();
         }
       };
-      
+
     } catch (error) {
       console.debug('Erro ao enviar notificação:', error);
     }
@@ -331,12 +442,12 @@ class NotificationService {
   testSound() {
     // Tentar garantir que o AudioContext está ativo
     this.ensureAudioContext();
-    
+
     // No mobile, usar vibração como feedback
     if (this.isMobile && navigator.vibrate) {
       navigator.vibrate([100, 50, 100, 50, 100]);
     }
-    
+
     this.playSound('notification');
     setTimeout(() => {
       this.playSound('success');
@@ -364,5 +475,7 @@ export const showNotification = (
 ) => {
   notificationService.showNotification(message, options);
 };
+
+
 
 export default notificationService;
