@@ -294,7 +294,6 @@ class NotificationService {
         read: false,
         createdAt: serverTimestamp(),
       });
-      console.log('✅ Notificação admin salva:', notification.orderNumber);
       return true;
     } catch (error) {
       console.error('❌ Erro ao salvar notificação admin:', error);

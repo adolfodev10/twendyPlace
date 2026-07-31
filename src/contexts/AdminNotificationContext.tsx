@@ -75,7 +75,6 @@ export const AdminNotificationProvider: React.FC<{ children: React.ReactNode }> 
                 if (previousOrdersRef.current.size > 0) {
                     const newIds = [...currentIds].filter(id => !previousOrdersRef.current.has(id));
                     if (newIds.length > 0) {
-                        console.log(`🆕 ${newIds.length} novo(s) pedido(s) pendente(s)`);
                     }
                 }
 
