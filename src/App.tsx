@@ -4,7 +4,6 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import { AdminNotificationProvider } from './contexts/AdminNotificationContext';
 import AdminNotificationBell from './components/AdminNotificationBell';
-import { Package } from 'lucide-react';
 
 // Pages
 import Store from './pages/Store';
@@ -29,18 +28,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {!isAuthPage && (
         <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              {/* Logo */}
-              <div className="flex items-center gap-3">
-                <a href="/" className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center">
-                    <Package className="w-6 h-6 text-white" />
-                  </div>
-                  <span className="text-xl font-bold text-gray-900">
-                    Twendy
-                  </span>
-                </a>
-              </div>
+            <div className="flex items-center justify-between">
 
               {/* Ações do Header */}
               <div className="flex items-center gap-3">
