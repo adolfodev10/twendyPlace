@@ -99,7 +99,6 @@ const PartnerProductCreator: React.FC<PartnerProductCreatorProps> = ({
                 toast.success('Produto do parceiro criado com sucesso!');
                 onSuccess();
                 onClose();
-                // Reset form
                 setProductData({
                     name: '',
                     price: 0,
@@ -125,7 +124,6 @@ const PartnerProductCreator: React.FC<PartnerProductCreatorProps> = ({
 
     if (!isOpen) return null;
 
-    // Calcular comissão estimada
     const estimatedCommission = productData.partnerPrice > 0
         ? (productData.partnerPrice * productData.commissionRate) / 100
         : 0;
