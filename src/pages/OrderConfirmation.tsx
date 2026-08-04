@@ -151,7 +151,6 @@ const OrderConfirmation: React.FC = () => {
           let width = img.width;
           let height = img.height;
 
-          // Redimensionar se necessário
           if (width > maxWidth) {
             height = Math.round((height * maxWidth) / width);
             width = maxWidth;
@@ -235,7 +234,6 @@ const OrderConfirmation: React.FC = () => {
     setUploadProgress(0);
 
     try {
-      // Comprimir imagem se necessário
       setUploadProgress(10);
       let fileToUpload = selectedFile;
 
@@ -244,13 +242,11 @@ const OrderConfirmation: React.FC = () => {
         console.log(`Imagem comprimida: ${(selectedFile.size / 1024).toFixed(2)}KB → ${(fileToUpload.size / 1024).toFixed(2)}KB`);
       }
 
-      // Converter para Base64
       setUploadProgress(30);
       const base64String = await fileToBase64(fileToUpload);
 
       setUploadProgress(60);
 
-      // Salvar no Firestore
       const orderRef = doc(db, 'orders', orderId);
       const previousProof = order.paymentProof;
 
@@ -272,13 +268,11 @@ const OrderConfirmation: React.FC = () => {
 
       setUploadProgress(100);
 
-      // Atualizar estado local
       setOrder({
         ...order,
         paymentProof: base64String,
       });
 
-      // Notificar admin
       try {
         await notificationService.saveAdminNotification({
           orderId: order.id,
@@ -300,7 +294,6 @@ const OrderConfirmation: React.FC = () => {
         { duration: 5000 }
       );
 
-      // Limpar estado
       setSelectedFile(null);
       setPreviewUrl(null);
       setShowReplaceConfirm(false);
@@ -324,7 +317,6 @@ const OrderConfirmation: React.FC = () => {
     }
   };
 
-  // Função para baixar comprovativo em Base64
   const downloadBase64 = (base64String: string, fileName: string = 'comprovativo') => {
     const link = document.createElement('a');
     link.href = base64String;
