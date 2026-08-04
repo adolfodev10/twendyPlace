@@ -3,8 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Order } from '../types';
 import { doc, getDoc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../services/firebase';
+import { db } from '../services/firebase';
 import { notificationService } from '../services/notificationService';
 import toast from 'react-hot-toast';
 import {
@@ -51,7 +50,6 @@ const OrderConfirmation: React.FC = () => {
         if (orderDoc.exists()) {
           const orderData = { id: orderDoc.id, ...orderDoc.data() } as Order;
 
-          // Verificar se o pedido pertence ao usuário
           if (orderData.userId !== user.uid) {
             toast.error('Pedido não encontrado');
             navigate('/my-orders');
@@ -78,7 +76,6 @@ const OrderConfirmation: React.FC = () => {
     if (!date) return 'Data não disponível';
 
     try {
-      // Se for um Timestamp do Firestore
       if (date.toDate && typeof date.toDate === 'function') {
         return date.toDate().toLocaleDateString('pt-BR', {
           day: '2-digit',
@@ -88,8 +85,7 @@ const OrderConfirmation: React.FC = () => {
           minute: '2-digit',
         });
       }
-      
-      // Se for um objeto com seconds (Firestore Timestamp serializado)
+
       if (date.seconds) {
         return new Date(date.seconds * 1000).toLocaleDateString('pt-BR', {
           day: '2-digit',
@@ -99,8 +95,7 @@ const OrderConfirmation: React.FC = () => {
           minute: '2-digit',
         });
       }
-      
-      // Se for uma string ISO
+
       if (typeof date === 'string') {
         return new Date(date).toLocaleDateString('pt-BR', {
           day: '2-digit',
@@ -110,8 +105,7 @@ const OrderConfirmation: React.FC = () => {
           minute: '2-digit',
         });
       }
-      
-      // Se já for um Date
+
       if (date instanceof Date) {
         return date.toLocaleDateString('pt-BR', {
           day: '2-digit',
@@ -129,18 +123,80 @@ const OrderConfirmation: React.FC = () => {
     }
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.7): Promise<File> => {
+    return new Promise((resolve) => {
+      if (file.type === 'application/pdf') {
+        resolve(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target?.result as string;
+
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Redimensionar se necessário
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const compressedFile = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                resolve(compressedFile);
+              } else {
+                resolve(file);
+              }
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+
+        img.onerror = () => resolve(file);
+      };
+
+      reader.onerror = () => resolve(file);
+    });
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validar tipo de arquivo
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
     if (!allowedTypes.includes(file.type)) {
       toast.error('Formato de arquivo não suportado. Use JPG, PNG, GIF, WebP ou PDF.');
       return;
     }
 
-    // Validar tamanho (máximo 10MB)
     if (file.size > 10 * 1024 * 1024) {
       toast.error('Arquivo muito grande. Máximo de 10MB.');
       return;
@@ -149,7 +205,6 @@ const OrderConfirmation: React.FC = () => {
     setSelectedFile(file);
     setShowReplaceConfirm(false);
 
-    // Criar preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreviewUrl(reader.result as string);
@@ -171,79 +226,76 @@ const OrderConfirmation: React.FC = () => {
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !order || !user || !orderId) return;
+    if (!selectedFile || !order || !user || !orderId) {
+      toast.error('Dados insuficientes para upload.');
+      return;
+    }
 
     setUploading(true);
     setUploadProgress(0);
 
     try {
-      // Nome do arquivo com timestamp para evitar cache
-      const timestamp = Date.now();
-      const fileExtension = selectedFile.name.split('.').pop();
-      const fileName = `comprovativos/${orderId}/${timestamp}.${fileExtension}`;
+      // Comprimir imagem se necessário
+      setUploadProgress(10);
+      let fileToUpload = selectedFile;
 
-      const storageRef = ref(storage, fileName);
+      if (selectedFile.type !== 'application/pdf' && selectedFile.size > 500 * 1024) {
+        fileToUpload = await compressImage(selectedFile, 800, 0.6);
+        console.log(`Imagem comprimida: ${(selectedFile.size / 1024).toFixed(2)}KB → ${(fileToUpload.size / 1024).toFixed(2)}KB`);
+      }
 
-      // Upload com progresso simulado
-      const uploadTask = uploadBytes(storageRef, selectedFile);
+      // Converter para Base64
+      setUploadProgress(30);
+      const base64String = await fileToBase64(fileToUpload);
 
-      // Simular progresso
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 200);
+      setUploadProgress(60);
 
-      await uploadTask;
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      // Obter URL do arquivo
-      const downloadURL = await getDownloadURL(storageRef);
-
-      // Atualizar pedido no Firestore
+      // Salvar no Firestore
       const orderRef = doc(db, 'orders', orderId);
-      
-      // Verificar se já existe um comprovativo anterior
       const previousProof = order.paymentProof;
-      
+
       await updateDoc(orderRef, {
-        paymentProof: downloadURL,
+        paymentProof: base64String,
         paymentProofUpdatedAt: serverTimestamp(),
         paymentProofHistory: arrayUnion({
-          url: downloadURL,
+          url: base64String,
           uploadedAt: new Date().toISOString(),
           fileName: selectedFile.name,
+          fileSize: fileToUpload.size,
+          fileType: fileToUpload.type,
           replaced: !!previousProof,
           previousUrl: previousProof || null,
+          uploadedBy: user.uid
         }),
         updatedAt: serverTimestamp(),
       });
 
+      setUploadProgress(100);
+
       // Atualizar estado local
       setOrder({
         ...order,
-        paymentProof: downloadURL,
+        paymentProof: base64String,
       });
 
-      // Notificar admin sobre o comprovativo
-      await notificationService.saveAdminNotification({
-        orderId: order.id,
-        orderNumber: order.orderNumber || order.id.slice(-8),
-        message: previousProof
-          ? `🔄 Comprovativo ATUALIZADO para o pedido #${order.orderNumber || order.id.slice(-8)}`
-          : `📤 Novo comprovativo enviado para o pedido #${order.orderNumber || order.id.slice(-8)}`,
-        type: 'payment_proof',
-        status: order.status,
-      });
+      // Notificar admin
+      try {
+        await notificationService.saveAdminNotification({
+          orderId: order.id,
+          orderNumber: order.orderNumber || order.id.slice(-8),
+          message: previousProof
+            ? `🔄 Comprovativo ATUALIZADO para o pedido #${order.orderNumber || order.id.slice(-8)}`
+            : `📤 Novo comprovativo enviado para o pedido #${order.orderNumber || order.id.slice(-8)}`,
+          type: 'payment_proof',
+          status: order.status,
+        });
+      } catch (notifError) {
+        console.error('Erro ao enviar notificação:', notifError);
+      }
 
       toast.success(
         previousProof
-          ? 'Comprovativo atualizado com sucesso! O novo comprovativo foi enviado.'
+          ? 'Comprovativo atualizado com sucesso!'
           : 'Comprovativo enviado com sucesso!',
         { duration: 5000 }
       );
@@ -255,17 +307,8 @@ const OrderConfirmation: React.FC = () => {
       setShowUploadSection(false);
 
     } catch (error: any) {
-      console.error('Erro ao enviar comprovativo:', error);
-
-      if (error.code === 'storage/unauthorized') {
-        toast.error('Sem permissão para enviar arquivo');
-      } else if (error.code === 'storage/canceled') {
-        toast.error('Upload cancelado');
-      } else if (error.code === 'storage/retry-limit-exceeded') {
-        toast.error('Falha no upload. Verifique sua conexão.');
-      } else {
-        toast.error('Erro ao enviar comprovativo. Tente novamente.');
-      }
+      console.error('Erro ao processar upload:', error);
+      toast.error('Erro ao enviar comprovativo. Tente novamente.');
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -279,6 +322,16 @@ const OrderConfirmation: React.FC = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  // Função para baixar comprovativo em Base64
+  const downloadBase64 = (base64String: string, fileName: string = 'comprovativo') => {
+    const link = document.createElement('a');
+    link.href = base64String;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const getStatusIcon = (status: string) => {
@@ -326,8 +379,8 @@ const OrderConfirmation: React.FC = () => {
     return labelMap[status] || status;
   };
 
-  const isPaymentProof = (url: string) => {
-    return /\.(pdf)$/i.test(url);
+  const isPDF = (url: string) => {
+    return url && url.startsWith('data:application/pdf');
   };
 
   if (loading) {
@@ -356,10 +409,9 @@ const OrderConfirmation: React.FC = () => {
     );
   }
 
-  // Permitir upload/reupload para pedidos em awaiting_payment, paid ou processing
-  const canUploadProof = order.status === 'awaiting_payment' || 
-                          order.status === 'paid' || 
-                          order.status === 'processing';
+  const canUploadProof = order.status === 'awaiting_payment' ||
+    order.status === 'paid' ||
+    order.status === 'processing';
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -388,7 +440,6 @@ const OrderConfirmation: React.FC = () => {
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Status do Pedido</h2>
 
-          {/* Timeline de Status */}
           <div className="space-y-4">
             {['awaiting_payment', 'paid', 'processing', 'shipped', 'delivered'].map((status) => {
               const statusOrder = ['awaiting_payment', 'paid', 'processing', 'shipped', 'delivered'];
@@ -399,9 +450,8 @@ const OrderConfirmation: React.FC = () => {
 
               return (
                 <div key={status} className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    isCompleted ? 'bg-green-100' : 'bg-gray-100'
-                  }`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isCompleted ? 'bg-green-100' : 'bg-gray-100'
+                    }`}>
                     {isCompleted ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     ) : (
@@ -428,7 +478,7 @@ const OrderConfirmation: React.FC = () => {
                 <FileImage className="h-5 w-5 text-primary-600" />
                 {order.paymentProof ? 'Comprovativo de Pagamento' : 'Enviar Comprovativo de Pagamento'}
               </h2>
-              
+
               {order.paymentProof && (
                 <button
                   onClick={() => setShowUploadSection(!showUploadSection)}
@@ -450,23 +500,22 @@ const OrderConfirmation: React.FC = () => {
               </div>
             )}
 
-            {/* Comprovativo atual (quando não está em modo de upload) */}
+            {/* Comprovativo atual */}
             {order.paymentProof && !showUploadSection && (
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-2">Comprovativo atual:</p>
                 <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ maxHeight: '400px' }}>
-                  {isPaymentProof(order.paymentProof) ? (
+                  {isPDF(order.paymentProof) ? (
                     <div className="p-8 text-center">
                       <FileImage className="h-16 w-16 mx-auto text-gray-400 mb-2" />
-                      <a
-                        href={order.paymentProof}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-600 hover:underline text-sm flex items-center justify-center gap-2"
+                      <p className="text-sm text-gray-600 mb-4">Arquivo PDF</p>
+                      <button
+                        onClick={() => downloadBase64(order.paymentProof, 'comprovativo.pdf')}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                       >
-                        <Eye className="h-4 w-4" />
-                        Ver PDF
-                      </a>
+                        <Download className="h-4 w-4" />
+                        Baixar PDF
+                      </button>
                     </div>
                   ) : (
                     <img
@@ -485,27 +534,25 @@ const OrderConfirmation: React.FC = () => {
                     >
                       <Eye className="h-4 w-4 text-gray-700" />
                     </a>
-                    <a
-                      href={order.paymentProof}
-                      download
+                    <button
+                      onClick={() => downloadBase64(order.paymentProof, `comprovativo-pedido-${order.orderNumber || orderId}`)}
                       className="p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors"
                       title="Baixar"
                     >
                       <Download className="h-4 w-4 text-gray-700" />
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Seção de Upload (mostrada quando não há comprovativo ou quando usuário quer alterar) */}
+            {/* Seção de Upload */}
             {(!order.paymentProof || showUploadSection) && (
               <>
-                {/* Confirmação de substituição */}
                 {showReplaceConfirm && (
                   <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-sm text-yellow-800 mb-3">
-                      ⚠️ Tem certeza que deseja substituir o comprovativo atual? 
+                      ⚠️ Tem certeza que deseja substituir o comprovativo atual?
                       O comprovativo anterior será arquivado.
                     </p>
                     <div className="flex gap-2">
@@ -525,7 +572,6 @@ const OrderConfirmation: React.FC = () => {
                   </div>
                 )}
 
-                {/* Preview do novo arquivo selecionado */}
                 {previewUrl && (
                   <div className="mb-4 relative">
                     <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ maxHeight: '300px' }}>
@@ -554,7 +600,6 @@ const OrderConfirmation: React.FC = () => {
                   </div>
                 )}
 
-                {/* Barra de progresso */}
                 {uploading && (
                   <div className="mb-4">
                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -563,7 +608,9 @@ const OrderConfirmation: React.FC = () => {
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1 text-center">{uploadProgress}%</p>
+                    <p className="text-xs text-gray-500 mt-1 text-center">
+                      {uploadProgress}% - Processando...
+                    </p>
                   </div>
                 )}
 
@@ -621,22 +668,27 @@ const OrderConfirmation: React.FC = () => {
                   )}
                 </div>
 
-                <p className="text-xs text-gray-400 mt-3">
-                  Formatos aceitos: JPG, PNG, GIF, WebP, PDF. Tamanho máximo: 10MB.
-                </p>
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">
+                    Formatos aceitos: JPG, PNG, GIF, WebP, PDF. Máximo: 10MB.
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    💡 As imagens serão comprimidas automaticamente para economizar espaço.
+                  </p>
+                </div>
               </>
             )}
           </div>
         )}
 
-        {/* Comprovativo enviado (não pode alterar - status final) */}
+        {/* Comprovativo enviado (status final) */}
         {order.paymentProof && !canUploadProof && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <FileImage className="h-5 w-5 text-green-600" />
               Comprovativo de Pagamento
             </h2>
-            
+
             <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
               <p className="text-sm text-gray-600">
                 O status do seu pedido não permite mais alterações no comprovativo.
@@ -644,18 +696,16 @@ const OrderConfirmation: React.FC = () => {
             </div>
 
             <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ maxHeight: '400px' }}>
-              {isPaymentProof(order.paymentProof) ? (
+              {isPDF(order.paymentProof) ? (
                 <div className="p-12 text-center">
                   <FileImage className="h-20 w-20 mx-auto text-gray-400 mb-4" />
-                  <a
-                    href={order.paymentProof}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                  <button
+                    onClick={() => downloadBase64(order.paymentProof, 'comprovativo.pdf')}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                   >
-                    <Eye className="h-4 w-4" />
-                    Ver PDF
-                  </a>
+                    <Download className="h-4 w-4" />
+                    Baixar PDF
+                  </button>
                 </div>
               ) : (
                 <>
@@ -674,14 +724,13 @@ const OrderConfirmation: React.FC = () => {
                     >
                       <Eye className="h-4 w-4 text-gray-700" />
                     </a>
-                    <a
-                      href={order.paymentProof}
-                      download
+                    <button
+                      onClick={() => downloadBase64(order.paymentProof, `comprovativo-pedido-${order.orderNumber || orderId}`)}
                       className="p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors"
                       title="Baixar"
                     >
                       <Download className="h-4 w-4 text-gray-700" />
-                    </a>
+                    </button>
                   </div>
                 </>
               )}
