@@ -19,7 +19,6 @@ class NotificationService {
   private isMobile = false;
 
   constructor() {
-    // Detectar se é mobile
     this.isMobile = /Android|iPhone|iPad|iPod|BlackBerry|Opera Mini|IEMobile/i.test(navigator.userAgent);
 
     this.setupUserInteraction();
@@ -32,7 +31,6 @@ class NotificationService {
           this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
           this.isInitialized = true;
 
-          // Tocar sons pendentes
           if (this.pendingSounds.length > 0) {
             this.pendingSounds.forEach(sound => {
               this.playSound(sound.type);
@@ -44,7 +42,6 @@ class NotificationService {
       }
     };
 
-    // Múltiplos eventos para garantir interação do usuário
     const events = ['click', 'touchstart', 'keydown', 'scroll', 'mousemove', 'pointerdown'];
     const initOnce = () => {
       init();
@@ -57,14 +54,11 @@ class NotificationService {
       document.addEventListener(event, initOnce, { once: true });
     });
 
-    // Tentar inicializar imediatamente (pode funcionar em alguns navegadores)
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       if (this.audioContext.state === 'running') {
         this.isInitialized = true;
       } else if (this.audioContext.state === 'suspended') {
-        // No mobile, o AudioContext geralmente começa suspenso
-        // Tenta resumir automaticamente (pode funcionar em alguns casos)
         if (!this.isMobile) {
           this.audioContext.resume().then(() => {
             this.isInitialized = true;
@@ -72,7 +66,6 @@ class NotificationService {
         }
       }
     } catch (e) {
-      // Ignorar erro, aguardar interação
     }
   }
 
@@ -80,7 +73,6 @@ class NotificationService {
     if (this.audioContext && this.audioContext.state === 'suspended') {
       this.audioContext.resume().then(() => {
         this.isInitialized = true;
-        // Tocar sons pendentes
         if (this.pendingSounds.length > 0) {
           this.pendingSounds.forEach(sound => {
             this.playSound(sound.type);
@@ -106,12 +98,10 @@ class NotificationService {
       return;
     }
 
-    // No mobile, tentar usar vibrate como fallback
     if (this.isMobile && navigator.vibrate) {
       try {
         navigator.vibrate([100, 50, 100]);
       } catch (e) {
-        // Ignorar erro de vibração
       }
     }
 
@@ -139,7 +129,6 @@ class NotificationService {
     try {
       const now = this.audioContext.currentTime;
 
-      // No mobile, usar tons mais altos e curtos
       const isMobile = this.isMobile;
 
       switch (type) {
@@ -177,7 +166,6 @@ class NotificationService {
       oscillator.frequency.value = frequency;
       oscillator.type = 'sine';
 
-      // No mobile, aumentar o volume um pouco
       const maxVolume = this.isMobile ? 0.4 : 0.3;
 
       gainNode.gain.setValueAtTime(0.01, startTime);
@@ -187,7 +175,6 @@ class NotificationService {
       oscillator.start(startTime);
       oscillator.stop(startTime + duration);
     } catch (error) {
-      // Ignorar erros de áudio
     }
   }
 
@@ -428,7 +415,6 @@ class NotificationService {
 
   toggleSound(enabled: boolean) {
     this.isSoundEnabled = enabled;
-    // Se estiver desativando, parar sons pendentes
     if (!enabled) {
       this.pendingSounds = [];
     }
@@ -439,7 +425,6 @@ class NotificationService {
   }
 
   testSound() {
-    // Tentar garantir que o AudioContext está ativo
     this.ensureAudioContext();
 
     // No mobile, usar vibração como feedback
