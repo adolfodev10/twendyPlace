@@ -21,7 +21,6 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 const findUserByUid = async (uid: string): Promise<User | null> => {
-  // Tentativa 1: Buscar documento com ID = uid
   const docRef = doc(db, 'users', uid);
   const docSnap = await getDoc(docRef);
 
@@ -45,7 +44,6 @@ const findUserByUid = async (uid: string): Promise<User | null> => {
     };
   }
 
-  // Tentativa 2: Buscar por campo 'uid'
   const q = query(collection(db, 'users'), where('uid', '==', uid));
   const snapshot = await getDocs(q);
 
@@ -71,7 +69,6 @@ const findUserByUid = async (uid: string): Promise<User | null> => {
     };
   }
 
-  // Tentativa 3: Buscar por email
   if (auth.currentUser?.email) {
     const emailQuery = query(collection(db, 'users'), where('email', '==', auth.currentUser?.email));
     const emailSnapshot = await getDocs(emailQuery);
@@ -140,13 +137,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         try {
-          // ✅ Usar a função de busca melhorada
           const userData = await findUserByUid(firebaseUser.uid);
 
           if (userData) {
             setUser(userData);
           } else {
-            // Criar usuário básico se não encontrado
             setUser({
               uid: firebaseUser.uid,
               id: firebaseUser.uid,
@@ -169,7 +164,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribeAuth();
   }, []);
 
-  // Listener de notificações para clientes
   useEffect(() => {
     if (!user || user.role === 'admin') return;
 
