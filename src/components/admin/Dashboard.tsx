@@ -136,7 +136,6 @@ const Dashboard: React.FC = () => {
     loadStats();
   }, []);
 
-  // 📊 DADOS PARA GRÁFICOS
   const chartData = useMemo(() => {
     const getDateFromValue = (value: unknown): Date | null => {
       if (!value) return null;
@@ -166,7 +165,6 @@ const Dashboard: React.FC = () => {
       return null;
     };
 
-    // Vendas dos últimos 7 dias
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() - (6 - i));
@@ -192,7 +190,6 @@ const Dashboard: React.FC = () => {
       };
     });
 
-    // Status dos pedidos
     const statusCount: Record<string, number> = {};
     stats.allOrders.forEach(o => {
       const status = o.status || 'unknown';
