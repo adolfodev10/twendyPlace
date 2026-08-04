@@ -11,7 +11,6 @@ interface HeaderProps {
   user: UserType | null;
 }
 
-// ✅ Função para obter iniciais
 const getInitials = (user: UserType): string => {
   if (user.name && user.name.trim()) {
     return user.name

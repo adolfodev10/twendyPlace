@@ -21,7 +21,6 @@ const Login: React.FC = () => {
     return re.test(email);
   };
 
-  // ✅ CORRETO: Redirecionar usando useEffect
   useEffect(() => {
     if (!authLoading && user) {
       const destination = user.role === 'admin' ? '/admin' : '/';
@@ -29,7 +28,6 @@ const Login: React.FC = () => {
     }
   }, [user, authLoading, navigate]);
 
-  // Limpar intervalo ao desmontar
   useEffect(() => {
     return () => {
       if (countdownInterval) {
@@ -38,7 +36,6 @@ const Login: React.FC = () => {
     };
   }, [countdownInterval]);
 
-  // Verificar status de bloqueio quando o email mudar
   useEffect(() => {
     const checkLockStatus = async () => {
       if (email && validateEmail(email)) {
@@ -125,8 +122,6 @@ const Login: React.FC = () => {
 
         toast.success('Login realizado com sucesso!');
         
-        // O redirecionamento será feito automaticamente pelo useEffect
-        // quando o usuário for atualizado no AuthContext
       } else {
         if (result.isLocked) {
           setIsLocked(true);
@@ -150,7 +145,6 @@ const Login: React.FC = () => {
     }
   };
 
-  // ✅ CORRETO: Mostrar loading enquanto verifica autenticação
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -159,7 +153,6 @@ const Login: React.FC = () => {
     );
   }
 
-  // ✅ CORRETO: Não renderizar formulário se já estiver autenticado
   if (user) {
     return null;
   }
