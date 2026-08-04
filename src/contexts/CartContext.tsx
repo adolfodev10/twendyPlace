@@ -31,12 +31,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [items, setItems] = useState<CartItem[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Carregar carrinho quando o usuário mudar
   useEffect(() => {
     const loadCart = async () => {
       try {
         if (user) {
-          // Usuário autenticado - carregar do Firestore
           const cartRef = doc(db, 'carts', user.uid);
           const cartDoc = await getDoc(cartRef);
           
@@ -48,19 +46,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setItems([]);
             }
           } else {
-            // Se não existe carrinho no Firestore, verificar localStorage
             const savedCart = localStorage.getItem('guestCart');
             if (savedCart) {
               try {
                 const parsedCart = JSON.parse(savedCart);
                 if (Array.isArray(parsedCart) && parsedCart.length > 0) {
-                  // Migrar carrinho do localStorage para o Firestore
                   setItems(parsedCart);
                   await setDoc(cartRef, {
                     items: parsedCart,
                     updatedAt: serverTimestamp(),
                   });
-                  localStorage.removeItem('guestCart'); // Limpar localStorage
+                  localStorage.removeItem('guestCart'); 
                 } else {
                   setItems([]);
                 }
@@ -72,7 +68,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
         } else {
-          // Usuário não autenticado - carregar do localStorage
           const savedCart = localStorage.getItem('guestCart');
           if (savedCart) {
             try {
@@ -91,7 +86,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (error) {
         console.error('Erro ao carregar carrinho:', error);
-        // Fallback para localStorage em caso de erro
         const savedCart = localStorage.getItem('guestCart');
         if (savedCart) {
           try {
@@ -108,17 +102,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     loadCart();
-  }, [user?.uid]); // Dependência apenas no UID do usuário
+  }, [user?.uid]); 
 
-  // Salvar carrinho quando items mudar
   useEffect(() => {
-    // Não salvar durante a inicialização
     if (!isInitialized) return;
 
     const saveCart = async () => {
       try {
         if (user) {
-          // Salvar no Firestore
           const cartRef = doc(db, 'carts', user.uid);
           await setDoc(cartRef, {
             items,
@@ -126,20 +117,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             userId: user.uid,
           }, { merge: true });
           
-          // Limpar localStorage do guest
           localStorage.removeItem('guestCart');
         } else {
-          // Salvar no localStorage para usuários não autenticados
           localStorage.setItem('guestCart', JSON.stringify(items));
         }
       } catch (error) {
         console.error('Erro ao salvar carrinho:', error);
-        // Fallback para localStorage em caso de erro
         localStorage.setItem('guestCart', JSON.stringify(items));
       }
     };
 
-    // Sempre salvar, mesmo com carrinho vazio (para limpar)
     saveCart();
   }, [items, user?.uid, isInitialized]);
 
@@ -149,7 +136,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (existing) {
         return current.map(item =>
           item.id === product.id 
-            ? { ...item, qty: Math.min(item.qty + 1, 99) } // Limite máximo de 99
+            ? { ...item, qty: Math.min(item.qty + 1, 99) } 
             : item
         );
       }
@@ -167,7 +154,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     
-    // Limitar quantidade máxima
     const safeQty = Math.min(qty, 99);
     
     setItems(current =>
