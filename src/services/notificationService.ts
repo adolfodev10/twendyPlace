@@ -427,7 +427,6 @@ class NotificationService {
   testSound() {
     this.ensureAudioContext();
 
-    // No mobile, usar vibração como feedback
     if (this.isMobile && navigator.vibrate) {
       navigator.vibrate([100, 50, 100, 50, 100]);
     }
