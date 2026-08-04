@@ -35,7 +35,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 
-// Histórico de status
 const STATUS_HISTORY: Record<string, { label: string; color: string; icon: any }> = {
     awaiting_payment: { label: 'Aguardando Pagamento', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
     paid: { label: 'Pago', color: 'bg-blue-100 text-blue-700', icon: CheckCircle },
@@ -45,7 +44,6 @@ const STATUS_HISTORY: Record<string, { label: string; color: string; icon: any }
     cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-700', icon: XCircle },
 };
 
-// Modal de Visualização de Comprovativo
 const ProofViewerModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -102,7 +100,6 @@ const ProofViewerModal: React.FC<{
     );
 };
 
-// Modal de Confirmação para validar pagamento
 const ValidatePaymentModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -182,7 +179,6 @@ const ValidatePaymentModal: React.FC<{
     );
 };
 
-// Modal para rejeitar comprovativo
 const RejectProofModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -281,7 +277,6 @@ const ProofPayment: React.FC = () => {
         return () => unsubscribe();
     }, []);
 
-    // Filtrar pedidos com comprovativos
     const ordersWithProof = orders.filter(order => order.paymentProof);
     const ordersWithoutProof = orders.filter(order => !order.paymentProof);
 
@@ -310,7 +305,6 @@ const ProofPayment: React.FC = () => {
             return new Date(value).getTime();
         };
 
-        // Ordenar por data (mais recentes primeiro)
         filtered.sort((a, b) => {
             const dateA = getTimeValue(a.createdAt);
             const dateB = getTimeValue(b.createdAt);
@@ -362,7 +356,6 @@ const ProofPayment: React.FC = () => {
                 validatedAt: now,
             });
 
-            // Notificar cliente
             if (order.userId) {
                 await saveNotificationForClient(order.userId, {
                     orderId: order.id,
@@ -389,7 +382,6 @@ const ProofPayment: React.FC = () => {
     const rejectProof = async (order: Order) => {
         setRejecting(true);
         try {
-            // Apenas notificar o cliente que o comprovativo foi rejeitado
             if (order.userId) {
                 await saveNotificationForClient(order.userId, {
                     orderId: order.id,
