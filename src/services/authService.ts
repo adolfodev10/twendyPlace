@@ -6,14 +6,14 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { 
-  doc, 
-  setDoc, 
-  serverTimestamp, 
-  getDoc, 
-  query, 
-  collection, 
-  getDocs, 
+import {
+  doc,
+  setDoc,
+  serverTimestamp,
+  getDoc,
+  query,
+  collection,
+  getDocs,
   where,
   updateDoc,
 } from 'firebase/firestore';
@@ -72,7 +72,7 @@ export const authService = {
   async checkLockStatus(email: string): Promise<LockStatus> {
     try {
       const lockDoc = await getDoc(doc(db, 'loginAttempts', email.toLowerCase()));
-      
+
       if (!lockDoc.exists()) {
         return { isLocked: false, attempts: 0 };
       }
@@ -80,18 +80,16 @@ export const authService = {
       const lockData = lockDoc.data();
       const lockoutUntil = lockData.lockoutUntil?.toDate();
 
-      // Verificar se está bloqueado
       if (lockoutUntil && lockoutUntil > new Date()) {
         const remainingMs = lockoutUntil.getTime() - Date.now();
         const remainingMinutes = Math.ceil(remainingMs / 60000);
-        return { 
-          isLocked: true, 
+        return {
+          isLocked: true,
           remainingMinutes,
           attempts: lockData.attempts || 0
         };
       }
 
-      // Se o período de bloqueio expirou, limpar o documento
       if (lockoutUntil && lockoutUntil <= new Date()) {
         await updateDoc(doc(db, 'loginAttempts', email.toLowerCase()), {
           attempts: 0,
@@ -101,8 +99,8 @@ export const authService = {
         return { isLocked: false, attempts: 0 };
       }
 
-      return { 
-        isLocked: false, 
+      return {
+        isLocked: false,
         attempts: lockData.attempts || 0
       };
     } catch (error) {
@@ -124,12 +122,10 @@ export const authService = {
 
       const { user } = userCredential;
 
-      // Atualizar perfil com nome
       await updateProfile(user, {
         displayName: data.name,
       });
 
-      // Salvar dados do usuário no Firestore
       await setDoc(doc(db, 'users', user.uid), {
         name: data.name,
         email: data.email,
@@ -160,16 +156,13 @@ export const authService = {
     }
   },
 
-  /**
-   * Login do usuário com controle de tentativas e bloqueio
-   */
+
   async login(email: string, password: string): Promise<LoginResult> {
     try {
       const normalizedEmail = email.toLowerCase().trim();
 
-      // Verificar se a conta está bloqueada
       const lockStatus = await this.checkLockStatus(normalizedEmail);
-      
+
       if (lockStatus.isLocked) {
         return {
           success: false,
@@ -180,11 +173,9 @@ export const authService = {
         };
       }
 
-      // Tentar fazer login
       const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       const uid = userCredential.user.uid;
 
-      // Resetar tentativas de login após sucesso
       await setDoc(doc(db, 'loginAttempts', normalizedEmail), {
         attempts: 0,
         lastAttempt: serverTimestamp(),
@@ -192,7 +183,6 @@ export const authService = {
         lastSuccessfulLogin: serverTimestamp()
       }, { merge: true });
 
-      // Buscar dados adicionais do usuário
       const userDoc = await getDoc(doc(db, 'users', uid));
 
       if (userDoc.exists()) {
@@ -208,7 +198,6 @@ export const authService = {
         };
       }
 
-      // Buscar por UID caso não encontre pelo ID do documento
       const q = query(collection(db, 'users'), where('uid', '==', uid));
       const snapshot = await getDocs(q);
 
@@ -234,32 +223,30 @@ export const authService = {
           name: userCredential.user.displayName || '',
         },
       };
-      
+
     } catch (error: any) {
       console.error('Erro no login:', error);
-      
+
       const normalizedEmail = email.toLowerCase().trim();
-      
-      // Buscar documento de tentativas
+
       const attemptsDoc = await getDoc(doc(db, 'loginAttempts', normalizedEmail));
       let attempts = 1;
-      
+
       if (attemptsDoc.exists()) {
         attempts = (attemptsDoc.data().attempts || 0) + 1;
       }
-      
-      // Verificar se deve bloquear a conta
+
       if (attempts >= MAX_LOGIN_ATTEMPTS) {
         const lockoutUntil = new Date();
         lockoutUntil.setMinutes(lockoutUntil.getMinutes() + LOCKOUT_DURATION_MINUTES);
-        
+
         await setDoc(doc(db, 'loginAttempts', normalizedEmail), {
           attempts,
           lastAttempt: serverTimestamp(),
           lockoutUntil,
           lastFailedAttempt: serverTimestamp()
         }, { merge: true });
-        
+
         return {
           success: false,
           isLocked: true,
@@ -268,18 +255,16 @@ export const authService = {
           remainingAttempts: 0
         };
       }
-      
-      // Atualizar tentativas
+
       await setDoc(doc(db, 'loginAttempts', normalizedEmail), {
         attempts,
         lastAttempt: serverTimestamp(),
         lockoutUntil: null,
         lastFailedAttempt: serverTimestamp()
       }, { merge: true });
-      
-      // Mapear erros do Firebase
+
       let message = 'Erro ao fazer login.';
-      
+
       switch (error.code) {
         case 'auth/user-not-found':
           message = 'Usuário não encontrado.';
@@ -300,11 +285,11 @@ export const authService = {
           message = 'Muitas tentativas. Aguarde alguns minutos.';
           break;
       }
-      
+
       const remainingAttempts = MAX_LOGIN_ATTEMPTS - attempts;
-      
-      return { 
-        success: false, 
+
+      return {
+        success: false,
         error: message,
         remainingAttempts: remainingAttempts > 0 ? remainingAttempts : 0
       };
