@@ -12,7 +12,6 @@ const firebaseConfig = {
   appId: (import.meta as any).env.VITE_FIREBASE_APP_ID || '',
 };
 
-// Verificar se as configurações existem
 const isFirebaseConfigured = 
   firebaseConfig.apiKey && 
   firebaseConfig.apiKey !== '' &&
