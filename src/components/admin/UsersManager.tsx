@@ -18,7 +18,7 @@ interface UserFormData {
 }
 
 const UsersManager: React.FC = () => {
-  const { user: currentUser } = useAuth(); // ✅ Usuário logado (Admin)
+  const { user: currentUser } = useAuth(); 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -61,7 +61,6 @@ const UsersManager: React.FC = () => {
     setLoading(true);
     try {
       const data = await userService.getAllUsers();
-      // ✅ Garantir que o Admin atual está na lista
       setUsers(data);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
@@ -164,7 +163,6 @@ const UsersManager: React.FC = () => {
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
     
-    // ✅ IMPEDIR auto-exclusão
     if (userToDelete.uid === currentUser?.uid || userToDelete.id === currentUser?.uid) {
       toast.error('Não podes excluir a tua própria conta!');
       return;
@@ -191,7 +189,6 @@ const UsersManager: React.FC = () => {
   const executeBulkDelete = async () => {
     if (selectedUsers.size === 0) return;
     
-    // ✅ Verificar se o Admin está na seleção
     if (currentUser && selectedUsers.has(currentUser.uid || '')) {
       toast.error('Não podes excluir a tua própria conta!');
       return;
@@ -233,11 +230,9 @@ const UsersManager: React.FC = () => {
     finally { setSaving(false); }
   };
 
-  // ✅ Usar id || uid para garantir compatibilidade
   const getUserId = (user: User) => user.id || user.uid;
 
   const toggleUserSelection = (userId: string) => {
-    // ✅ Não permitir selecionar a si mesmo
     if (currentUser && (userId === currentUser.uid || userId === currentUser.id)) {
       toast.error('Não podes selecionar a tua própria conta!');
       return;
@@ -254,7 +249,6 @@ const UsersManager: React.FC = () => {
       setSelectedUsers(new Set());
       setSelectAll(false);
     } else {
-      // ✅ Excluir o Admin da seleção
       const allIds = filteredUsers
         .filter(u => getUserId(u) !== currentUser?.uid && getUserId(u) !== currentUser?.id)
         .map(u => getUserId(u));
@@ -292,7 +286,6 @@ const UsersManager: React.FC = () => {
     return email?.split('@')[0].slice(0, 2).toUpperCase() || 'U';
   };
 
-  // ✅ Verificar se é o usuário atual
   const isCurrentUser = (user: User) => 
     currentUser && (getUserId(user) === currentUser.uid || getUserId(user) === currentUser.id);
 
