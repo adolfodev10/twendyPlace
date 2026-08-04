@@ -43,7 +43,6 @@ import {
 import { db } from '../../services/firebase';
 import { notificationService } from '../../services/notificationService';
 
-// Configuração de transições de status permitidas
 const STATUS_TRANSITIONS: Record<string, string[]> = {
     awaiting_payment: ['paid', 'cancelled'],
     paid: ['processing', 'cancelled'],
@@ -52,8 +51,6 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
     delivered: [],
     cancelled: [],
 };
-
-// Histórico de status
 const STATUS_HISTORY: Record<string, { label: string; color: string; icon: any }> = {
     awaiting_payment: { label: 'Aguardando Pagamento', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
     paid: { label: 'Pago', color: 'bg-blue-100 text-blue-700', icon: CheckCircle },
@@ -63,7 +60,6 @@ const STATUS_HISTORY: Record<string, { label: string; color: string; icon: any }
     cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-700', icon: XCircle },
 };
 
-// Modal de Visualização de Comprovativo
 const ProofViewerModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -114,7 +110,6 @@ const ProofViewerModal: React.FC<{
     );
 };
 
-// Modal de Confirmação para Status
 const ConfirmModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -179,7 +174,6 @@ const ConfirmModal: React.FC<{
     );
 };
 
-// Modal de Exclusão em Massa
 const BulkDeleteConfirmModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -252,7 +246,6 @@ const OrdersManager: React.FC = () => {
     const [viewingProof, setViewingProof] = useState<{ orderId: string; url: string } | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    // Seleção múltipla
     const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
     const [selectAll, setSelectAll] = useState(false);
 
@@ -299,7 +292,6 @@ const OrdersManager: React.FC = () => {
         return () => unsubscribe();
     }, [filter]);
 
-    // Limpar seleção quando o filtro ou busca mudar
     useEffect(() => {
         setSelectedOrders(new Set());
         setSelectAll(false);
@@ -308,19 +300,16 @@ const OrdersManager: React.FC = () => {
     const prevOrdersRef = useRef<Order[]>([]);
 
     const checkForNewOrders = (newOrders: Order[]) => {
-        // Verificar novos pedidos (aumento na quantidade)
         if (prevOrdersRef.current.length > 0 && newOrders.length > prevOrdersRef.current.length) {
             const prevIds = new Set(prevOrdersRef.current.map(o => o.id));
             const newOrdersList = newOrders.filter(o => !prevIds.has(o.id));
 
             newOrdersList.forEach(newOrder => {
-                // Mostrar toast
                 toast.success(`🛍️ Novo pedido #${newOrder.orderNumber} recebido!`, {
                     duration: 8000,
                     icon: <Package className="w-5 h-5 text-green-500" />,
                 });
 
-                // Salvar notificação para o admin
                 notificationService.saveAdminNotification({
                     orderId: newOrder.id,
                     orderNumber: newOrder.orderNumber || newOrder.id.slice(-8),
@@ -331,19 +320,16 @@ const OrdersManager: React.FC = () => {
             });
         }
 
-        // Verificar comprovativos enviados (paymentProof adicionado)
         if (prevOrdersRef.current.length > 0) {
             prevOrdersRef.current.forEach(prevOrder => {
                 const currentOrder = newOrders.find(o => o.id === prevOrder.id);
 
-                // Se antes não tinha comprovativo e agora tem
                 if (currentOrder && !prevOrder.paymentProof && currentOrder.paymentProof) {
                     toast.success(`📎 Comprovativo enviado - Pedido #${currentOrder.orderNumber}`, {
                         duration: 6000,
                         icon: <FileImage className="w-5 h-5 text-blue-500" />,
                     });
 
-                    // Salvar notificação de comprovativo
                     notificationService.saveAdminNotification({
                         orderId: currentOrder.id,
                         orderNumber: currentOrder.orderNumber || currentOrder.id.slice(-8),
@@ -358,7 +344,6 @@ const OrdersManager: React.FC = () => {
         prevOrdersRef.current = newOrders;
     };
 
-    // Filtrar pedidos com base na busca
     const filteredOrders = useMemo(() => {
         return orders.filter(order => {
             if (!search) return true;
@@ -371,17 +356,14 @@ const OrdersManager: React.FC = () => {
         });
     }, [orders, search]);
 
-    // Obter pedidos que podem ser deletados (cancelados ou entregues)
     const getDeletableOrders = useMemo(() => {
         return filteredOrders.filter(order =>
             order.status === 'cancelled' || order.status === 'delivered'
         );
     }, [filteredOrders]);
 
-    // Verificar se há pedidos selecionáveis
     const hasSelectableOrders = getDeletableOrders.length > 0;
 
-    // Funções de seleção
     const toggleOrderSelection = (orderId: string) => {
         setSelectedOrders(prev => {
             const newSelected = new Set(prev);
@@ -405,7 +387,6 @@ const OrdersManager: React.FC = () => {
         }
     };
 
-    // Sincronizar selectAll com a quantidade de selecionados
     useEffect(() => {
         if (getDeletableOrders.length > 0) {
             setSelectAll(selectedOrders.size === getDeletableOrders.length);
@@ -514,7 +495,6 @@ const OrdersManager: React.FC = () => {
                 });
             }
 
-            // Salvar notificação de mudança de status para o admin também
             notificationService.saveAdminNotification({
                 orderId: orderId,
                 orderNumber: orderNumber || orderId.slice(-8),
@@ -553,7 +533,6 @@ const OrdersManager: React.FC = () => {
         }
     };
 
-    // Executar exclusão em massa
     const executeBulkDelete = async () => {
         if (selectedOrders.size === 0) return;
 
@@ -580,7 +559,6 @@ const OrdersManager: React.FC = () => {
 
                     const orderData = orderSnap.data();
 
-                    // Restaurar estoque se o pedido não foi cancelado
                     if (orderData.status !== 'cancelled' && orderData.items) {
                         const stockBatch = writeBatch(db);
                         for (const item of orderData.items) {
