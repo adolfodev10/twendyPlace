@@ -50,7 +50,6 @@ export const partnerService = {
      */
     async getAllPartners(status?: 'active' | 'inactive' | 'pending'): Promise<Partner[]> {
         try {
-            // Tentar com índice (quando estiver pronto)
             const collectionRef = collection(db, 'partners');
             const constraints: any[] = [];
 
@@ -71,7 +70,6 @@ export const partnerService = {
 
                 try {
                     const collectionRef = collection(db, 'partners');
-                    // Inicializar q como Query para permitir reatribuições com query(...)
                     let q: Query<DocumentData> = query(collectionRef);
 
                     if (status) {
@@ -147,7 +145,6 @@ export const partnerService = {
         commissionRate: number
     ): Promise<{ success: boolean; id?: string; error?: string }> {
         try {
-            // Buscar produto
             const productDoc = await getDoc(doc(db, 'products', productId));
             if (!productDoc.exists()) {
                 return { success: false, error: 'Produto não encontrado' };
@@ -155,7 +152,6 @@ export const partnerService = {
 
             const productData = productDoc.data();
 
-            // Verificar se parceiro existe
             const partnerDoc = await getDoc(doc(db, 'partners', partnerId));
             if (!partnerDoc.exists()) {
                 return { success: false, error: 'Parceiro não encontrado' };
