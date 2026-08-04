@@ -19,7 +19,6 @@ const ClientsManager: React.FC = () => {
     loadClients();
   }, []);
 
-  // Limpar seleção quando a busca mudar
   useEffect(() => {
     setSelectedClients(new Set());
     setSelectAll(false);
