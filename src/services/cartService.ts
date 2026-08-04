@@ -509,7 +509,6 @@ export const cartService = {
                 paidBy: 'admin',
             });
 
-            // Atualizar total de comissão paga do parceiro
             const partnerRef = doc(db, 'partners', partnerId);
             await updateDoc(partnerRef, {
                 totalCommissionPaid: increment(1),
