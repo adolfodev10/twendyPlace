@@ -1,4 +1,3 @@
-// src/contexts/AdminNotificationContext.tsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
     collection,
@@ -69,7 +68,6 @@ export const AdminNotificationProvider: React.FC<{ children: React.ReactNode }> 
 
                 setPendingOrdersCount(snapshot.size);
 
-                // Detectar novos pedidos (para log)
                 if (previousOrdersRef.current.size > 0) {
                     const newIds = [...currentIds].filter(id => !previousOrdersRef.current.has(id));
                     if (newIds.length > 0) {
@@ -86,11 +84,9 @@ export const AdminNotificationProvider: React.FC<{ children: React.ReactNode }> 
         return () => unsubscribe();
     }, [isAdmin]);
 
-    // Listener para notificações do admin
     useEffect(() => {
         if (!isAdmin) return;
 
-        // Para adminNotifications também usamos sem orderBy se der erro
         const notificationsQuery = query(
             collection(db, 'adminNotifications'),
             orderBy('createdAt', 'desc'),
