@@ -23,7 +23,6 @@ const getInitials = (user: UserType): string => {
   return user.email?.split('@')[0].slice(0, 2).toUpperCase() || 'U';
 };
 
-// ✅ Componente Avatar
 const UserAvatar: React.FC<{ user: UserType }> = ({ user }) => {
   const [imgError, setImgError] = useState(false);
 
@@ -38,7 +37,6 @@ const UserAvatar: React.FC<{ user: UserType }> = ({ user }) => {
     );
   }
 
-  // Círculo azul com iniciais
   return (
     <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center">
       <span className="text-white font-bold text-sm">
