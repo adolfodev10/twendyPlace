@@ -28,7 +28,6 @@ import {
 import toast from 'react-hot-toast';
 import PartnerProductCreator from './PartnerProductCreator';
 
-// Modal de Visualização de Produtos do Parceiro
 const PartnerProductsModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -107,7 +106,6 @@ const PartnerProductsModal: React.FC<{
     );
 };
 
-// Modal de Adicionar Produto ao Parceiro
 const AddProductModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
