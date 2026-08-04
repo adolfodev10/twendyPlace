@@ -93,7 +93,6 @@ export const cartService = {
         try {
             const orderNumber = "ORD-" + Date.now().toString().slice(-8);
 
-            // 1. Buscar informações dos produtos (para verificar parceiros)
             const productPromises = cartItems.map(async (item) => {
                 if (item.id) {
                     const productDoc = await getDoc(doc(db, 'products', item.id));
@@ -110,7 +109,6 @@ export const cartService = {
                 if (p) productMap.set(p.id, p.data);
             });
 
-            // 2. Criar pedido no Firestore
             const orderData = {
                 userId: userId,
                 orderNumber: orderNumber,
@@ -143,15 +141,12 @@ export const cartService = {
                 updatedAt: serverTimestamp(),
             };
 
-            // Usar Batch Write
             const batch = writeBatch(db);
 
-            // Adicionar o pedido ao batch
             const orderRef = doc(collection(db, 'orders'));
             const orderId = orderRef.id;
             batch.set(orderRef, orderData);
 
-            // 2. ATUALIZAR ESTOQUE DOS PRODUTOS
             for (const item of cartItems) {
                 if (item.id && item.qty) {
                     const productRef = doc(db, 'products', item.id);
@@ -161,7 +156,6 @@ export const cartService = {
                 }
             }
 
-            // 3. REGISTRAR COMISSÕES DOS PARCEIROS
             const commissionPromises = cartItems.map(async (item) => {
                 const product = productMap.get(item.id);
                 if (product?.isPartnerProduct && product?.partnerId) {
@@ -194,24 +188,20 @@ export const cartService = {
             const commissionResults = await Promise.all(commissionPromises);
             const validCommissions = commissionResults.filter(c => c !== null);
 
-            // Atualizar o pedido com as comissões
             if (validCommissions.length > 0) {
                 await setDoc(orderRef, {
                     partnerCommissions: validCommissions,
                 }, { merge: true });
             }
 
-            // 4. LIMPAR CARRINHO DO USUÁRIO
             const userDocRef = doc(db, 'users', userId);
             batch.update(userDocRef, {
                 cart: [],
                 cartUpdatedAt: new Date().toISOString(),
             });
 
-            // 5. EXECUTAR TODAS AS OPERAÇÕES EM LOTE
             await batch.commit();
 
-            // 6. Retornar sucesso
             return {
                 success: true,
                 orderId: orderId,
@@ -228,9 +218,6 @@ export const cartService = {
         }
     },
 
-    /**
-     * Buscar pedidos do usuário
-     */
     async getOrders(userId: string): Promise<Order[]> {
 
         try {
