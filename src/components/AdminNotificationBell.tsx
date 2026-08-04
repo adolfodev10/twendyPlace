@@ -33,7 +33,6 @@ const AdminNotificationBell: React.FC = () => {
 
   if (!isAdmin) return null;
 
-  // Fechar dropdown ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -45,7 +44,6 @@ const AdminNotificationBell: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Animação do sino quando há novas notificações
   useEffect(() => {
     if (unreadCount > 0) {
       setIsAnimating(true);
