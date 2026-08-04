@@ -24,6 +24,7 @@ import {
   Download,
   Eye,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 
 const OrderConfirmation: React.FC = () => {
@@ -36,7 +37,8 @@ const OrderConfirmation: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [, setShowReplaceConfirm] = useState(false);
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
+  const [showUploadSection, setShowUploadSection] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -50,7 +52,7 @@ const OrderConfirmation: React.FC = () => {
           const orderData = { id: orderDoc.id, ...orderDoc.data() } as Order;
 
           // Verificar se o pedido pertence ao usuário
-          if (orderData.userId !== user.uid && orderData.userId !== user.uid) {
+          if (orderData.userId !== user.uid) {
             toast.error('Pedido não encontrado');
             navigate('/my-orders');
             return;
@@ -72,6 +74,61 @@ const OrderConfirmation: React.FC = () => {
     loadOrder();
   }, [orderId, user, navigate]);
 
+  const formatDate = (date: any): string => {
+    if (!date) return 'Data não disponível';
+
+    try {
+      // Se for um Timestamp do Firestore
+      if (date.toDate && typeof date.toDate === 'function') {
+        return date.toDate().toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+      
+      // Se for um objeto com seconds (Firestore Timestamp serializado)
+      if (date.seconds) {
+        return new Date(date.seconds * 1000).toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+      
+      // Se for uma string ISO
+      if (typeof date === 'string') {
+        return new Date(date).toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+      
+      // Se já for um Date
+      if (date instanceof Date) {
+        return date.toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+
+      return 'Data não disponível';
+    } catch (error) {
+      console.error('Erro ao formatar data:', error);
+      return 'Data não disponível';
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -90,6 +147,7 @@ const OrderConfirmation: React.FC = () => {
     }
 
     setSelectedFile(file);
+    setShowReplaceConfirm(false);
 
     // Criar preview
     const reader = new FileReader();
@@ -97,6 +155,19 @@ const OrderConfirmation: React.FC = () => {
       setPreviewUrl(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleReplaceClick = () => {
+    if (order?.paymentProof) {
+      setShowReplaceConfirm(true);
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const confirmReplace = () => {
+    setShowReplaceConfirm(false);
+    fileInputRef.current?.click();
   };
 
   const handleUpload = async () => {
@@ -113,10 +184,10 @@ const OrderConfirmation: React.FC = () => {
 
       const storageRef = ref(storage, fileName);
 
-      // Upload com progresso
+      // Upload com progresso simulado
       const uploadTask = uploadBytes(storageRef, selectedFile);
 
-      // Simular progresso (uploadBytes não tem on progress nativamente)
+      // Simular progresso
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           if (prev >= 90) {
@@ -136,6 +207,10 @@ const OrderConfirmation: React.FC = () => {
 
       // Atualizar pedido no Firestore
       const orderRef = doc(db, 'orders', orderId);
+      
+      // Verificar se já existe um comprovativo anterior
+      const previousProof = order.paymentProof;
+      
       await updateDoc(orderRef, {
         paymentProof: downloadURL,
         paymentProofUpdatedAt: serverTimestamp(),
@@ -143,7 +218,8 @@ const OrderConfirmation: React.FC = () => {
           url: downloadURL,
           uploadedAt: new Date().toISOString(),
           fileName: selectedFile.name,
-          replaced: !!order.paymentProof,
+          replaced: !!previousProof,
+          previousUrl: previousProof || null,
         }),
         updatedAt: serverTimestamp(),
       });
@@ -158,16 +234,16 @@ const OrderConfirmation: React.FC = () => {
       await notificationService.saveAdminNotification({
         orderId: order.id,
         orderNumber: order.orderNumber || order.id.slice(-8),
-        message: order.paymentProof
-          ? `Comprovativo ATUALIZADO para o pedido #${order.orderNumber || order.id.slice(-8)}`
-          : `Novo comprovativo enviado para o pedido #${order.orderNumber || order.id.slice(-8)}`,
+        message: previousProof
+          ? `🔄 Comprovativo ATUALIZADO para o pedido #${order.orderNumber || order.id.slice(-8)}`
+          : `📤 Novo comprovativo enviado para o pedido #${order.orderNumber || order.id.slice(-8)}`,
         type: 'payment_proof',
         status: order.status,
       });
 
       toast.success(
-        order.paymentProof
-          ? 'Comprovativo atualizado com sucesso!'
+        previousProof
+          ? 'Comprovativo atualizado com sucesso! O novo comprovativo foi enviado.'
           : 'Comprovativo enviado com sucesso!',
         { duration: 5000 }
       );
@@ -176,6 +252,7 @@ const OrderConfirmation: React.FC = () => {
       setSelectedFile(null);
       setPreviewUrl(null);
       setShowReplaceConfirm(false);
+      setShowUploadSection(false);
 
     } catch (error: any) {
       console.error('Erro ao enviar comprovativo:', error);
@@ -198,6 +275,7 @@ const OrderConfirmation: React.FC = () => {
   const clearFileSelection = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
+    setShowReplaceConfirm(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -248,6 +326,10 @@ const OrderConfirmation: React.FC = () => {
     return labelMap[status] || status;
   };
 
+  const isPaymentProof = (url: string) => {
+    return /\.(pdf)$/i.test(url);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -262,12 +344,22 @@ const OrderConfirmation: React.FC = () => {
         <div className="text-center">
           <Package className="h-16 w-16 mx-auto text-gray-300 mb-4" />
           <p className="text-gray-500">Pedido não encontrado</p>
+          <Link
+            to="/my-orders"
+            className="mt-4 inline-flex items-center gap-2 text-primary-600 hover:text-primary-700"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar para meus pedidos
+          </Link>
         </div>
       </div>
     );
   }
 
-  const canUploadProof = order.status === 'awaiting_payment';
+  // Permitir upload/reupload para pedidos em awaiting_payment, paid ou processing
+  const canUploadProof = order.status === 'awaiting_payment' || 
+                          order.status === 'paid' || 
+                          order.status === 'processing';
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -283,7 +375,7 @@ const OrderConfirmation: React.FC = () => {
               Voltar para meus pedidos
             </Link>
             <h1 className="text-2xl font-bold text-gray-900">
-              Pedido #{order.orderNumber}
+              Pedido #{order.orderNumber || order.id?.slice(-8)}
             </h1>
           </div>
           <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
@@ -307,8 +399,9 @@ const OrderConfirmation: React.FC = () => {
 
               return (
                 <div key={status} className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isCompleted ? 'bg-green-100' : 'bg-gray-100'
-                    }`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    isCompleted ? 'bg-green-100' : 'bg-gray-100'
+                  }`}>
                     {isCompleted ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     ) : (
@@ -318,69 +411,60 @@ const OrderConfirmation: React.FC = () => {
                   <span className={`text-sm ${isCurrent ? 'font-semibold text-gray-900' : 'text-gray-500'}`}>
                     {getStatusLabel(status)}
                   </span>
+                  {isCurrent && (
+                    <span className="text-xs text-primary-600 font-medium">(Atual)</span>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Upload/Visualização de Comprovativo */}
+        {/* Seção de Upload/Alteração de Comprovativo */}
         {canUploadProof && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <FileImage className="h-5 w-5 text-primary-600" />
-              {order.paymentProof ? 'Atualizar Comprovativo' : 'Enviar Comprovativo de Pagamento'}
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FileImage className="h-5 w-5 text-primary-600" />
+                {order.paymentProof ? 'Comprovativo de Pagamento' : 'Enviar Comprovativo de Pagamento'}
+              </h2>
+              
+              {order.paymentProof && (
+                <button
+                  onClick={() => setShowUploadSection(!showUploadSection)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  {showUploadSection ? 'Cancelar alteração' : 'Alterar comprovativo'}
+                </button>
+              )}
+            </div>
 
-            {order.paymentProof && (
+            {/* Alerta de comprovativo existente */}
+            {order.paymentProof && !showUploadSection && (
               <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-700 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" />
-                  Você já enviou um comprovativo. Pode substituí-lo se necessário.
+                  Você já enviou um comprovativo. Se precisar corrigi-lo, clique em "Alterar comprovativo".
                 </p>
               </div>
             )}
 
-            {/* Preview do arquivo selecionado */}
-            {previewUrl && (
-              <div className="mb-4 relative">
-                <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ maxHeight: '300px' }}>
-                  {selectedFile?.type === 'application/pdf' ? (
-                    <div className="p-8 text-center">
-                      <FileImage className="h-16 w-16 mx-auto text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-600">{selectedFile.name}</p>
-                    </div>
-                  ) : (
-                    <img
-                      src={previewUrl}
-                      alt="Preview do comprovativo"
-                      className="w-full h-full object-contain"
-                    />
-                  )}
-                  <button
-                    onClick={clearFileSelection}
-                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Comprovativo atual */}
-            {order.paymentProof && !previewUrl && (
+            {/* Comprovativo atual (quando não está em modo de upload) */}
+            {order.paymentProof && !showUploadSection && (
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-2">Comprovativo atual:</p>
-                <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ maxHeight: '200px' }}>
-                  {order.paymentProof.match(/\.(pdf)$/i) ? (
+                <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ maxHeight: '400px' }}>
+                  {isPaymentProof(order.paymentProof) ? (
                     <div className="p-8 text-center">
                       <FileImage className="h-16 w-16 mx-auto text-gray-400 mb-2" />
                       <a
                         href={order.paymentProof}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary-600 hover:underline text-sm"
+                        className="text-primary-600 hover:underline text-sm flex items-center justify-center gap-2"
                       >
+                        <Eye className="h-4 w-4" />
                         Ver PDF
                       </a>
                     </div>
@@ -391,78 +475,176 @@ const OrderConfirmation: React.FC = () => {
                       className="w-full h-full object-contain"
                     />
                   )}
+                  <div className="absolute bottom-4 right-4 flex gap-2">
+                    <a
+                      href={order.paymentProof}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors"
+                      title="Ver em tela cheia"
+                    >
+                      <Eye className="h-4 w-4 text-gray-700" />
+                    </a>
+                    <a
+                      href={order.paymentProof}
+                      download
+                      className="p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors"
+                      title="Baixar"
+                    >
+                      <Download className="h-4 w-4 text-gray-700" />
+                    </a>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Barra de progresso */}
-            {uploading && (
-              <div className="mb-4">
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${uploadProgress}%` }}
+            {/* Seção de Upload (mostrada quando não há comprovativo ou quando usuário quer alterar) */}
+            {(!order.paymentProof || showUploadSection) && (
+              <>
+                {/* Confirmação de substituição */}
+                {showReplaceConfirm && (
+                  <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800 mb-3">
+                      ⚠️ Tem certeza que deseja substituir o comprovativo atual? 
+                      O comprovativo anterior será arquivado.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={confirmReplace}
+                        className="px-4 py-2 text-sm bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+                      >
+                        Sim, substituir
+                      </button>
+                      <button
+                        onClick={() => setShowReplaceConfirm(false)}
+                        className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview do novo arquivo selecionado */}
+                {previewUrl && (
+                  <div className="mb-4 relative">
+                    <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ maxHeight: '300px' }}>
+                      {selectedFile?.type === 'application/pdf' ? (
+                        <div className="p-8 text-center">
+                          <FileImage className="h-16 w-16 mx-auto text-gray-400 mb-2" />
+                          <p className="text-sm text-gray-600">{selectedFile.name}</p>
+                        </div>
+                      ) : (
+                        <img
+                          src={previewUrl}
+                          alt="Preview do novo comprovativo"
+                          className="w-full h-full object-contain"
+                        />
+                      )}
+                      <button
+                        onClick={clearFileSelection}
+                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Novo arquivo: {selectedFile?.name}
+                    </p>
+                  </div>
+                )}
+
+                {/* Barra de progresso */}
+                {uploading && (
+                  <div className="mb-4">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 text-center">{uploadProgress}%</p>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    disabled={uploading}
                   />
-                </div>
-                <p className="text-xs text-gray-500 mt-1 text-center">{uploadProgress}%</p>
-              </div>
-            )}
 
-            <div className="flex flex-wrap gap-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
-                onChange={handleFileSelect}
-                className="hidden"
-                disabled={uploading}
-              />
+                  <button
+                    onClick={handleReplaceClick}
+                    disabled={uploading}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {order.paymentProof ? 'Escolher novo comprovativo' : 'Escolher comprovativo'}
+                  </button>
 
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-              >
-                <Upload className="h-4 w-4" />
-                {order.paymentProof ? 'Escolher novo arquivo' : 'Escolher arquivo'}
-              </button>
-
-              {selectedFile && (
-                <button
-                  onClick={handleUpload}
-                  disabled={uploading}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4" />
-                      {order.paymentProof ? 'Atualizar Comprovativo' : 'Enviar Comprovativo'}
-                    </>
+                  {selectedFile && (
+                    <button
+                      onClick={handleUpload}
+                      disabled={uploading}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4" />
+                          {order.paymentProof ? 'Enviar novo comprovativo' : 'Enviar comprovativo'}
+                        </>
+                      )}
+                    </button>
                   )}
-                </button>
-              )}
-            </div>
 
-            <p className="text-xs text-gray-400 mt-3">
-              Formatos aceitos: JPG, PNG, GIF, WebP, PDF. Tamanho máximo: 10MB.
-            </p>
+                  {order.paymentProof && (
+                    <button
+                      onClick={() => {
+                        setShowUploadSection(false);
+                        clearFileSelection();
+                      }}
+                      disabled={uploading}
+                      className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
+                    >
+                      <X className="h-4 w-4" />
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+
+                <p className="text-xs text-gray-400 mt-3">
+                  Formatos aceitos: JPG, PNG, GIF, WebP, PDF. Tamanho máximo: 10MB.
+                </p>
+              </>
+            )}
           </div>
         )}
 
-        {/* Comprovativo enviado (não pode alterar) */}
+        {/* Comprovativo enviado (não pode alterar - status final) */}
         {order.paymentProof && !canUploadProof && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <FileImage className="h-5 w-5 text-green-600" />
               Comprovativo de Pagamento
             </h2>
+            
+            <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <p className="text-sm text-gray-600">
+                O status do seu pedido não permite mais alterações no comprovativo.
+              </p>
+            </div>
+
             <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ maxHeight: '400px' }}>
-              {order.paymentProof.match(/\.(pdf)$/i) ? (
+              {isPaymentProof(order.paymentProof) ? (
                 <div className="p-12 text-center">
                   <FileImage className="h-20 w-20 mx-auto text-gray-400 mb-4" />
                   <a
@@ -471,8 +653,8 @@ const OrderConfirmation: React.FC = () => {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
                   >
-                    <Download className="h-4 w-4" />
-                    Baixar PDF
+                    <Eye className="h-4 w-4" />
+                    Ver PDF
                   </a>
                 </div>
               ) : (
@@ -553,45 +735,14 @@ const OrderConfirmation: React.FC = () => {
             <div className="flex items-center gap-2 text-gray-600">
               <Calendar className="h-4 w-4" />
               <span>
-                Pedido realizado em{' '}
-                {(order?.createdAt as { toDate?: () => Date })?.toDate
-                  ? (order?.createdAt as Date)?.toLocaleDateString('pt-BR', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                  : order?.createdAt
-                    ? new Date(order.createdAt.getDate() * 1000).toLocaleDateString('pt-BR', {
-                      day: '2-digit',
-                      month: 'long',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                    : typeof order?.createdAt === 'string'
-                      ? new Date(order.createdAt).toLocaleDateString('pt-BR', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                      : order?.createdAt instanceof Date
-                        ? order.createdAt.toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: 'long',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                        : 'Data não disponível'}
+                Pedido realizado em {formatDate(order.createdAt)}
               </span>
             </div>
             <div className="flex items-center gap-2 text-gray-600">
               <CreditCard className="h-4 w-4" />
-              <span>Pagamento: {order.paymentProof ? 'Comprovativo enviado' : 'Aguardando comprovativo'}</span>
+              <span>
+                Pagamento: {order.paymentProof ? 'Comprovativo enviado' : 'Aguardando comprovativo'}
+              </span>
             </div>
           </div>
         </div>
