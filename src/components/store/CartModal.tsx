@@ -1,7 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { X, ShoppingCart, Trash2, Minus, Plus, CreditCard, Upload, File, Check, AlertCircle, MapPin, Phone, Mail, Building, Copy, Edit3, Save } from 'lucide-react';
+import { 
+  X, ShoppingCart, Trash2, Minus, Plus, CreditCard, 
+  Upload, File, Check, AlertCircle, MapPin, Phone, Mail, 
+  Building, Copy, Edit3, Save, Truck, ShieldCheck, Clock, Banknote
+} from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { cartService } from '../../services/cartService';
@@ -12,10 +16,12 @@ interface CartModalProps {
   onClose: () => void;
 }
 
+type PaymentMethod = 'delivery' | 'multicaixa';
+
 const ConfirmModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (userData: { phone: string; address: string; city: string }) => void;
+  onConfirm: (userData: { phone: string; address: string; city: string }, paymentMethod: PaymentMethod) => void;
   total: number;
   items: any[];
   loading: boolean;
@@ -35,162 +41,222 @@ const ConfirmModal: React.FC<{
   isOpen, onClose, onConfirm, total, items, loading, onFileUpload,
   uploadedFile, isUploading, uploadedFileURL, userData
 }) => {
+  if (!isOpen) return null;
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-    if (!isOpen) return null;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editPhone, setEditPhone] = useState(userData?.phone || '');
+  const [editAddress, setEditAddress] = useState(userData?.address || '');
+  const [editCity, setEditCity] = useState(userData?.city || '');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('delivery');
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (userData) {
+      setEditPhone(userData.phone || '');
+      setEditAddress(userData.address || '');
+      setEditCity(userData.city || '');
+    }
+  }, [userData]);
 
-    const [isEditing, setIsEditing] = useState(false);
-    const [editPhone, setEditPhone] = useState(userData?.phone || '');
-    const [editAddress, setEditAddress] = useState(userData?.address || '');
-    const [editCity, setEditCity] = useState(userData?.city || '');
+  const COMPANY_IBAN = 'AO06.0040.0000.1234.5678.9012.3';
+  const COMPANY_NAME = 'Twendy Create LDA.';
 
-    useEffect(() => {
-      if (userData) {
-        setEditPhone(userData.phone || '');
-        setEditAddress(userData.address || '');
-        setEditCity(userData.city || '');
-      }
-    }, [userData]);
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success(`${label} copiado!`);
+    }).catch(() => toast.error(`Erro ao copiar ${label}`));
+  };
 
-    const COMPANY_IBAN = 'AO06.0040.0000.1234.5678.9012.3';
-    const COMPANY_NAME = 'Twendy Create LDA.';
+  const handleConfirm = () => {
+    onConfirm({
+      phone: editPhone,
+      address: editAddress,
+      city: editCity,
+    }, paymentMethod);
+  };
 
-    const copyToClipboard = (text: string) => {
-      navigator.clipboard.writeText(text).then(() => {
-        toast.success('IBAN copiado!');
-      }).catch(() => toast.error('Erro ao copiar IBAN'));
-    };
+  const hasCompleteData = editPhone.trim() && editAddress.trim() && editCity.trim();
 
-    const handleConfirm = () => {
-      onConfirm({
-        phone: editPhone,
-        address: editAddress,
-        city: editCity,
-      });
-    };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl p-4 sm:p-8 max-w-2xl w-full mx-2 sm:mx-4 shadow-2xl animate-[modalSlideUp_0.3s_ease] max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="text-center">
+          <div className="w-16 sm:w-20 h-16 sm:h-20 mx-auto bg-blue-50 rounded-full flex items-center justify-center mb-4">
+            <CreditCard className="w-8 sm:w-10 h-8 sm:h-10 text-primary-600" />
+          </div>
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Finalizar Pedido</h3>
+          <p className="text-gray-500 mb-6">
+            Confirme seu pedido de <strong className="text-primary-600">Kz {total.toFixed(2)}</strong>
+          </p>
 
-    const hasCompleteData = editPhone.trim() && editAddress.trim() && editCity.trim();
-
-    return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center">
-        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-        <div className="relative bg-white rounded-2xl p-4 sm:p-8 max-w-2xl w-full mx-2 sm:mx-4 shadow-2xl animate-[modalSlideUp_0.3s_ease] max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
-          <div className="text-center">
-            <div className="w-16 sm:w-20 h-16 sm:h-20 mx-auto bg-blue-50 rounded-full flex items-center justify-center mb-4">
-              <CreditCard className="w-8 sm:w-10 h-8 sm:h-10 text-primary-600" />
-            </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Finalizar Pedido</h3>
-            <p className="text-gray-500 mb-6">
-              Confirme seu pedido de <strong className="text-primary-600">Kz {total.toFixed(2)}</strong>
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
-              <div className="bg-blue-50 rounded-xl p-4 text-left">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <Building className="w-4 h-4 text-blue-600" />
-                    Seus Dados
-                  </h4>
-                  <button
-                    onClick={() => setIsEditing(!isEditing)}
-                    className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
-                  >
-                    {isEditing ? <Save className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
-                    {isEditing ? 'Salvar' : 'Editar'}
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-start gap-2">
-                    <Mail className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500">Nome / Email</p>
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {userData?.name || 'Não informado'}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {userData?.email || 'Não informado'}
-                      </p>
-                    </div>
+          {/* Seleção do Método de Pagamento */}
+          <div className="mb-6">
+            <h4 className="font-semibold text-gray-900 mb-3 text-left">Método de Pagamento</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Pagamento na Entrega */}
+              <button
+                onClick={() => setPaymentMethod('delivery')}
+                className={`p-4 rounded-xl border-2 transition-all text-left ${
+                  paymentMethod === 'delivery'
+                    ? 'border-green-600 bg-green-50 shadow-lg'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Truck className="w-5 h-5 text-green-600" />
                   </div>
-
-                  <div className="flex items-start gap-2">
-                    <Phone className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500">Telefone *</p>
-                      {isEditing ? (
-                        <input
-                          type="tel"
-                          value={editPhone}
-                          onChange={(e) => setEditPhone(e.target.value)}
-                          placeholder="+244 9XX XXX XXX"
-                          className="w-full mt-1 px-3 py-1.5 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                        />
-                      ) : (
-                        <p className={`text-sm font-medium ${editPhone ? 'text-gray-900' : 'text-red-500'}`}>
-                          {editPhone || '⚠️ Obrigatório - Clique em Editar'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500">Morada *</p>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editAddress}
-                          onChange={(e) => setEditAddress(e.target.value)}
-                          placeholder="Rua, número, bairro..."
-                          className="w-full mt-1 px-3 py-1.5 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                        />
-                      ) : (
-                        <p className={`text-sm font-medium ${editAddress ? 'text-gray-900' : 'text-red-500'}`}>
-                          {editAddress || '⚠️ Obrigatório - Clique em Editar'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500">Cidade *</p>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editCity}
-                          onChange={(e) => setEditCity(e.target.value)}
-                          placeholder="Sua cidade"
-                          className="w-full mt-1 px-3 py-1.5 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                        />
-                      ) : (
-                        <p className={`text-sm font-medium ${editCity ? 'text-gray-900' : 'text-red-500'}`}>
-                          {editCity || '⚠️ Obrigatório - Clique em Editar'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {!hasCompleteData && (
-                  <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-red-600">
-                      Preencha telefone, morada e cidade antes de finalizar.
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Pagamento na Entrega</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Pague em dinheiro ou TPA quando receber seu produto
                     </p>
+                    <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
+                      <ShieldCheck className="w-3 h-3" />
+                      <span>Sem pagamento antecipado</span>
+                    </div>
                   </div>
-                )}
+                </div>
+              </button>
+
+              {/* Transferência Bancária */}
+              <button
+                onClick={() => setPaymentMethod('multicaixa')}
+                className={`p-4 rounded-xl border-2 transition-all text-left ${
+                  paymentMethod === 'multicaixa'
+                    ? 'border-blue-600 bg-blue-50 shadow-lg'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Building className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Transferência Bancária</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Transfira para nosso IBAN e envie o comprovativo
+                    </p>
+                    <div className="mt-2 flex items-center gap-1 text-xs text-yellow-600">
+                      <Clock className="w-3 h-3" />
+                      <span>Confirmação em 24-72h</span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Dados do Cliente */}
+          <div className="bg-blue-50 rounded-xl p-4 mb-6 text-left">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Building className="w-4 h-4 text-blue-600" />
+                Seus Dados
+              </h4>
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+              >
+                {isEditing ? <Save className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
+                {isEditing ? 'Salvar' : 'Editar'}
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-start gap-2">
+                <Mail className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-500">Nome / Email</p>
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {userData?.name || 'Não informado'}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {userData?.email || 'Não informado'}
+                  </p>
+                </div>
               </div>
 
-              <div className="bg-green-50 rounded-xl p-4 text-left">
+              <div className="flex items-start gap-2">
+                <Phone className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-500">Telefone *</p>
+                  {isEditing ? (
+                    <input
+                      type="tel"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="+244 9XX XXX XXX"
+                      className="w-full mt-1 px-3 py-1.5 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    />
+                  ) : (
+                    <p className={`text-sm font-medium ${editPhone ? 'text-gray-900' : 'text-red-500'}`}>
+                      {editPhone || '⚠️ Obrigatório - Clique em Editar'}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-500">Morada *</p>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editAddress}
+                      onChange={(e) => setEditAddress(e.target.value)}
+                      placeholder="Rua, número, bairro..."
+                      className="w-full mt-1 px-3 py-1.5 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    />
+                  ) : (
+                    <p className={`text-sm font-medium ${editAddress ? 'text-gray-900' : 'text-red-500'}`}>
+                      {editAddress || '⚠️ Obrigatório - Clique em Editar'}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-500">Cidade *</p>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editCity}
+                      onChange={(e) => setEditCity(e.target.value)}
+                      placeholder="Sua cidade"
+                      className="w-full mt-1 px-3 py-1.5 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    />
+                  ) : (
+                    <p className={`text-sm font-medium ${editCity ? 'text-gray-900' : 'text-red-500'}`}>
+                      {editCity || '⚠️ Obrigatório - Clique em Editar'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {!hasCompleteData && (
+              <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-red-600">
+                  Preencha telefone, morada e cidade antes de finalizar.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Informações de Pagamento - Transferência */}
+          {paymentMethod === 'multicaixa' && (
+            <>
+              <div className="bg-green-50 rounded-xl p-4 mb-6 text-left">
                 <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-green-600" />
-                  Pagamento por Multicaixa
+                  <Building className="w-4 h-4 text-green-600" />
+                  Dados para Transferência
                 </h4>
                 <div className="space-y-3">
                   <div>
@@ -201,102 +267,152 @@ const ConfirmModal: React.FC<{
                     <p className="text-xs text-gray-500">IBAN</p>
                     <div className="flex items-center gap-2 bg-white rounded-lg p-2 mt-1 border border-gray-200">
                       <p className="text-sm font-mono font-bold text-gray-900 flex-1 select-all">{COMPANY_IBAN}</p>
-                      <button onClick={() => copyToClipboard(COMPANY_IBAN)} className="p-1.5 hover:bg-gray-100 rounded-lg">
+                      <button onClick={() => copyToClipboard(COMPANY_IBAN, 'IBAN')} className="p-1.5 hover:bg-gray-100 rounded-lg">
                         <Copy className="w-4 h-4 text-gray-500" />
                       </button>
                     </div>
                   </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-xs text-yellow-700 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Transferências entre bancos diferentes podem levar 24-72h úteis
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left max-h-40 overflow-y-auto">
-              <h4 className="font-semibold text-gray-900 mb-2">Resumo do Pedido</h4>
-              {items.map((item, index) => (
-                <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
-                  <span className="text-sm text-gray-700">{item.name}</span>
-                  <span className="text-sm font-medium text-gray-900">{item.qty}x Kz {(item.price * item.qty).toFixed(2)}</span>
-                </div>
-              ))}
-              <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-gray-300">
-                <span className="font-bold text-gray-900">Total</span>
-                <span className="font-bold text-primary-600 text-lg">Kz {total.toFixed(2)}</span>
+              {/* Upload de comprovativo - OPCIONAL para transferência */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-left">
+                  Comprovativo de Pagamento <span className="text-gray-400">(Opcional)</span>
+                </label>
+                {!uploadedFileURL ? (
+                  <div
+                    className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${uploadedFile ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary-400'}`}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden"
+                      onChange={(e) => { if (e.target.files?.[0]) onFileUpload(e.target.files[0]); }} />
+                    {uploadedFile ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <File className="w-8 h-8 text-green-500" />
+                        <div>
+                          <p className="text-sm font-medium text-green-700">{uploadedFile.name}</p>
+                          <p className="text-xs text-gray-500">{(uploadedFile.size / 1024).toFixed(0)} KB</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <Upload className="w-10 h-10 mx-auto text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-600">Clique para fazer upload (opcional)</p>
+                        <p className="text-xs text-gray-400 mt-1">PNG, JPG ou PDF (máx. 5MB)</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+                    <Check className="w-6 h-6 text-green-500" />
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-medium text-green-700">Comprovativo enviado!</p>
+                      <button onClick={() => window.open(uploadedFileURL, '_blank')} className="text-xs text-primary-600 hover:text-primary-700">Ver comprovativo</button>
+                    </div>
+                  </div>
+                )}
+                <p className="mt-2 text-xs text-gray-500 text-left">
+                  * O upload é opcional. Se não enviar, nossa equipe confirmará manualmente o pagamento.
+                </p>
               </div>
-            </div>
+            </>
+          )}
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 text-left">
-              <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-yellow-600" /> Instruções
+          {/* Informações - Pagamento na Entrega */}
+          {paymentMethod === 'delivery' && (
+            <div className="bg-green-50 rounded-xl p-4 mb-6 text-left">
+              <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-green-600" />
+                Pagamento na Entrega
               </h4>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-700">
+                  Você pagará <strong>Kz {total.toFixed(2)}</strong> quando receber seu produto.
+                </p>
+                <div className="flex items-start gap-2">
+                  <Banknote className="w-4 h-4 text-green-600 mt-0.5" />
+                  <p className="text-xs text-gray-600">
+                    Aceitamos dinheiro ou cartão (TPA) no momento da entrega.
+                  </p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Truck className="w-4 h-4 text-green-600 mt-0.5" />
+                  <p className="text-xs text-gray-600">
+                    Nossa equipe entrará em contato para confirmar a entrega.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Resumo do Pedido */}
+          <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left max-h-40 overflow-y-auto">
+            <h4 className="font-semibold text-gray-900 mb-2">Resumo do Pedido</h4>
+            {items.map((item, index) => (
+              <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
+                <span className="text-sm text-gray-700">{item.name}</span>
+                <span className="text-sm font-medium text-gray-900">{item.qty}x Kz {(item.price * item.qty).toFixed(2)}</span>
+              </div>
+            ))}
+            <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-gray-300">
+              <span className="font-bold text-gray-900">Total</span>
+              <span className="font-bold text-primary-600 text-lg">Kz {total.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* Instruções */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 text-left">
+            <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-yellow-600" /> Instruções
+            </h4>
+            {paymentMethod === 'delivery' ? (
+              <ol className="text-sm text-gray-700 space-y-1 list-decimal list-inside">
+                <li>Confirme seus dados de entrega acima</li>
+                <li>Nosso time entrará em contato</li>
+                <li>Pague quando receber o produto</li>
+              </ol>
+            ) : (
               <ol className="text-sm text-gray-700 space-y-1 list-decimal list-inside">
                 <li>Preencha seu telefone e morada acima</li>
                 <li>Realize a transferência para o IBAN</li>
-                <li>Faça o upload do comprovativo abaixo</li>
+                <li>Envie o comprovativo (opcional)</li>
                 <li>Confirme o pedido</li>
               </ol>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2 text-left">
-                Comprovativo de Pagamento *
-              </label>
-              {!uploadedFileURL ? (
-                <div
-                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${uploadedFile ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary-400'}`}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden"
-                    onChange={(e) => { if (e.target.files?.[0]) onFileUpload(e.target.files[0]); }} />
-                  {uploadedFile ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <File className="w-8 h-8 text-green-500" />
-                      <div>
-                        <p className="text-sm font-medium text-green-700">{uploadedFile.name}</p>
-                        <p className="text-xs text-gray-500">{(uploadedFile.size / 1024).toFixed(0)} KB</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <Upload className="w-10 h-10 mx-auto text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-600">Clique para fazer upload</p>
-                      <p className="text-xs text-gray-400 mt-1">PNG, JPG ou PDF (máx. 5MB)</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
-                  <Check className="w-6 h-6 text-green-500" />
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-medium text-green-700">Comprovativo enviado!</p>
-                    <button onClick={() => window.open(uploadedFileURL, '_blank')} className="text-xs text-primary-600 hover:text-primary-700">Ver comprovativo</button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={onClose} disabled={loading} className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold disabled:opacity-50">
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirm}
-                disabled={loading || !uploadedFileURL || isUploading || !hasCompleteData}
-                className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {loading ? 'Processando...' : isUploading ? 'Enviando...' : 'Confirmar Pedido'}
-              </button>
-            </div>
-            {(!uploadedFileURL || !hasCompleteData) && !isUploading && (
-              <p className="mt-2 text-xs text-red-500">
-                <AlertCircle className="w-3 h-3 inline mr-1" />
-                {!hasCompleteData ? 'Preencha telefone, morada e cidade' : 'Envie o comprovativo de pagamento'}
-              </p>
             )}
           </div>
+
+          {/* Botões */}
+          <div className="flex gap-3">
+            <button onClick={onClose} disabled={loading} className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold disabled:opacity-50">
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={loading || isUploading || !hasCompleteData}
+              className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? 'Processando...' : isUploading ? 'Enviando...' : paymentMethod === 'delivery' ? 'Confirmar Pedido' : 'Confirmar Transferência'}
+            </button>
+          </div>
+          
+          {!hasCompleteData && !isUploading && (
+            <p className="mt-2 text-xs text-red-500">
+              <AlertCircle className="w-3 h-3 inline mr-1" />
+              Preencha telefone, morada e cidade
+            </p>
+          )}
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
 const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
   const { items, removeItem, updateQuantity, totalItems, totalPrice, clearCart } = useCart();
@@ -364,8 +480,7 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
     finally { setIsUploading(false); }
   };
 
-  const handleConfirmOrder = async (editedData: { phone: string; address: string; city: string }) => {
-    if (!uploadedFileURL) { toast.error('Envie o comprovativo'); return; }
+  const handleConfirmOrder = async (editedData: { phone: string; address: string; city: string }, paymentMethod: PaymentMethod) => {
     if (!validateStockBeforeCheckout()) { setShowConfirmModal(false); return; }
 
     setLoading(true);
@@ -387,11 +502,18 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
       };
 
       const result = await cartService.createOrder(
-        user!.uid, items, totalPrice, customerData, 'multicaixa', uploadedFileURL
+        user!.uid,
+        items,
+        totalPrice,
+        customerData,
+        paymentMethod,
+        uploadedFileURL ?? undefined // Upload opcional
       );
 
       if (result.success) {
-        clearCart(); setShowConfirmModal(false); onClose();
+        clearCart(); 
+        setShowConfirmModal(false); 
+        onClose();
         navigate(`/order-confirmation/${result.orderId}`);
         toast.success(`Pedido #${result.orderNumber} criado!`);
       } else {

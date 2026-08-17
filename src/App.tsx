@@ -24,30 +24,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="min-h-screen bg-gray-50">
       {/* Header com Notificações */}
       {!isAuthPage && (
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+        <header className="bg-white sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 py-2 sm:px-6 lg:px-8">
             <div className="flex items-center justify-end">
-
-              {/* Ações do Header */}
-              <div className="flex items-center gap-3  justify-end">
-                {/* Sino de Notificações (apenas Admin) */}
-                {isAdmin && <AdminNotificationBell />}
-
-                {/* Informações do Usuário */}
-                {user && (
-                  <div className="flex items-center gap-2 pl-3 border-l border-gray-200">
-                    <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-bold text-primary-700">
-                        {user.name?.charAt(0)?.toUpperCase() || 'U'}
-                      </span>
-                    </div>
-                    <div className="hidden sm:block">
-                      <p className="text-sm font-medium text-gray-700">{user.name}</p>
-                      <p className="text-xs text-gray-500 capitalize">{user.role}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {isAdmin && <AdminNotificationBell />}
             </div>
           </div>
         </header>
