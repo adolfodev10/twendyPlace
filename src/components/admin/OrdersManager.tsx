@@ -27,6 +27,8 @@ import {
     Calendar,
     DollarSign,
     Eye,
+    Banknote,
+    Building,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -44,13 +46,14 @@ import { db } from '../../services/firebase';
 import { notificationService } from '../../services/notificationService';
 
 const STATUS_TRANSITIONS: Record<string, string[]> = {
-    awaiting_payment: ['paid', 'cancelled'],
+    awaiting_payment: ['paid', 'processing', 'cancelled'],  // ✅ Permite ir direto para processamento
     paid: ['processing', 'cancelled'],
     processing: ['shipped', 'cancelled'],
     shipped: ['delivered', 'cancelled'],
     delivered: [],
     cancelled: [],
 };
+
 const STATUS_HISTORY: Record<string, { label: string; color: string; icon: any }> = {
     awaiting_payment: { label: 'Aguardando Pagamento', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
     paid: { label: 'Pago', color: 'bg-blue-100 text-blue-700', icon: CheckCircle },
@@ -256,6 +259,7 @@ const OrdersManager: React.FC = () => {
         oldStatus: string;
         orderNumber: string;
         hasProof: boolean;
+        paymentMethod: string;
     }>({
         isOpen: false,
         orderId: '',
@@ -263,6 +267,7 @@ const OrdersManager: React.FC = () => {
         oldStatus: '',
         orderNumber: '',
         hasProof: false,
+        paymentMethod: 'multicaixa',
     });
 
     const [bulkDeleteModal, setBulkDeleteModal] = useState<{
@@ -408,8 +413,10 @@ const OrdersManager: React.FC = () => {
 
         const order = orders.find(o => o.id === orderId);
         const hasProof = !!order?.paymentProof;
+        const paymentMethod = order?.paymentMethod || 'multicaixa';
 
-        if (newStatus === 'paid' && !hasProof) {
+        // ✅ Só exige comprovativo para transferência bancária
+        if (newStatus === 'paid' && !hasProof && paymentMethod !== 'delivery') {
             toast.error('Cliente não enviou comprovativo de pagamento', {
                 icon: <AlertCircle className="w-5 h-5 text-red-500" />,
                 duration: 5000,
@@ -424,6 +431,7 @@ const OrdersManager: React.FC = () => {
             oldStatus,
             orderNumber,
             hasProof,
+            paymentMethod,
         });
     };
 
@@ -446,7 +454,7 @@ const OrdersManager: React.FC = () => {
             if (!orderSnap.exists()) {
                 toast.error('Pedido não encontrado');
                 setUpdating(null);
-                setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '', hasProof: false });
+                setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '', hasProof: false, paymentMethod: 'multicaixa' });
                 return;
             }
 
@@ -529,7 +537,7 @@ const OrdersManager: React.FC = () => {
             }
         } finally {
             setUpdating(null);
-            setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '', hasProof: false });
+            setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '', hasProof: false, paymentMethod: 'multicaixa' });
         }
     };
 
@@ -710,14 +718,14 @@ const OrdersManager: React.FC = () => {
             {/* Modal de Confirmação para Status */}
             <ConfirmModal
                 isOpen={confirmModal.isOpen}
-                onClose={() => setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '', hasProof: false })}
+                onClose={() => setConfirmModal({ isOpen: false, orderId: '', newStatus: '', oldStatus: '', orderNumber: '', hasProof: false, paymentMethod: 'multicaixa' })}
                 onConfirm={executeStatusChange}
                 title="Confirmar Mudança de Status"
                 message={`Deseja alterar o pedido #${confirmModal.orderNumber} de "${STATUS_HISTORY[confirmModal.oldStatus]?.label || confirmModal.oldStatus}" para "${STATUS_HISTORY[confirmModal.newStatus]?.label || confirmModal.newStatus}"?`}
                 loading={updating === confirmModal.orderId}
                 confirmText="Confirmar"
                 cancelText="Cancelar"
-                warning={confirmModal.newStatus === 'paid' ? 'Ao confirmar, o pagamento será validado e o cliente será notificado.' : undefined}
+                warning={confirmModal.newStatus === 'paid' && confirmModal.paymentMethod !== 'delivery' ? 'Ao confirmar, o pagamento será validado e o cliente será notificado.' : undefined}
             />
 
             {/* Modal de Exclusão em Massa */}
@@ -809,7 +817,7 @@ const OrdersManager: React.FC = () => {
             {/* Orders Table */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[1050px]">
+                    <table className="w-full min-w-[1100px]">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 w-12">
@@ -835,6 +843,10 @@ const OrdersManager: React.FC = () => {
                                     <User className="w-3.5 h-3.5 inline mr-1" />
                                     Cliente
                                 </th>
+                                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">
+                                    <Banknote className="w-3.5 h-3.5 inline mr-1" />
+                                    Pagamento
+                                </th>
                                 <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 hidden sm:table-cell">
                                     <Calendar className="w-3.5 h-3.5 inline mr-1" />
                                     Data
@@ -856,7 +868,7 @@ const OrdersManager: React.FC = () => {
                         <tbody>
                             {filteredOrders.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="text-center py-8 text-gray-500">
+                                    <td colSpan={9} className="text-center py-8 text-gray-500">
                                         <AlertCircle className="w-12 h-12 mx-auto text-gray-300 mb-2" />
                                         <p>Nenhum pedido encontrado</p>
                                     </td>
@@ -868,6 +880,7 @@ const OrdersManager: React.FC = () => {
                                     const isPaidOrProcessing = order.status === 'paid' || order.status === 'processing';
                                     const isDeletable = order.status === 'cancelled' || order.status === 'delivered';
                                     const isSelected = selectedOrders.has(order.id);
+                                    const paymentMethod = order.paymentMethod || 'multicaixa';
 
                                     return (
                                         <tr key={order.id} className={`border-b border-gray-100 transition-colors ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}>
@@ -901,6 +914,24 @@ const OrdersManager: React.FC = () => {
                                                     </p>
                                                 </div>
                                             </td>
+                                            <td className="py-3 px-3 sm:px-4">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${paymentMethod === 'delivery'
+                                                        ? 'bg-green-100 text-green-700'
+                                                        : 'bg-blue-100 text-blue-700'
+                                                    }`}>
+                                                    {paymentMethod === 'delivery' ? (
+                                                        <>
+                                                            <Banknote className="w-3 h-3" />
+                                                            Na Entrega
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Building className="w-3 h-3" />
+                                                            Transferência
+                                                        </>
+                                                    )}
+                                                </span>
+                                            </td>
                                             <td className="py-3 px-3 sm:px-4 text-gray-600 text-xs hidden sm:table-cell">
                                                 {formatDate(order.createdAt)}
                                             </td>
@@ -925,7 +956,7 @@ const OrdersManager: React.FC = () => {
                                                     </button>
                                                 ) : (
                                                     <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg whitespace-nowrap">
-                                                        Não enviado
+                                                        {paymentMethod === 'delivery' ? 'Não necessário' : 'Não enviado'}
                                                     </span>
                                                 )}
                                             </td>
@@ -954,10 +985,16 @@ const OrdersManager: React.FC = () => {
                                                     {!isDeletable && (
                                                         <span className="text-[10px] text-gray-400">Ativo</span>
                                                     )}
-                                                    {!hasProof && order.status === 'awaiting_payment' && (
+                                                    {!hasProof && order.status === 'awaiting_payment' && paymentMethod === 'multicaixa' && (
                                                         <span className="text-xs text-yellow-600 flex items-center gap-1">
                                                             <AlertCircle className="w-3 h-3" />
                                                             Aguardando comprovativo
+                                                        </span>
+                                                    )}
+                                                    {!hasProof && order.status === 'awaiting_payment' && paymentMethod === 'delivery' && (
+                                                        <span className="text-xs text-green-600 flex items-center gap-1">
+                                                            <Truck className="w-3 h-3" />
+                                                            Entrega pendente
                                                         </span>
                                                     )}
                                                     {isPaidOrProcessing && (
