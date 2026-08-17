@@ -49,6 +49,7 @@ const UserAvatar: React.FC<{ user: UserType }> = ({ user }) => {
 const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   const handleLogout = async () => {
     await authService.logout();
@@ -60,13 +61,24 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">T</span>
-            </div>
-            <span className="text-xl font-bold text-gray-900 hidden sm:block">
-              Twendy Create
-            </span>
+          {/* Logo atualizado */}
+          <Link to="/" className="flex items-center gap-3">
+            {logoError ? (
+                    <img
+                src={"/logo.jpg"}
+                alt="Twendy Create Logo"
+                className="w-10 h-10 sm:w-12 sm:h-12 object-contain rounded-lg"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <img
+                src={"../../assets/logo.jpg"}
+                alt="Twendy Create Logo"
+                className="w-10 h-10 sm:w-12 sm:h-12 object-contain rounded-lg"
+                onError={() => setLogoError(true)}
+              />
+            )}
+          
           </Link>
 
           <div className="hidden md:flex items-center gap-4">
@@ -92,7 +104,6 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
                   onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 rounded-lg transition-colors"
                 >
-                  {/* ✅ Avatar com fallback */}
                   <UserAvatar user={user} />
                   <span className="hidden lg:inline">
                     {user.name || user.email?.split('@')[0] || 'Usuário'}
