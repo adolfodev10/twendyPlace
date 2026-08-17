@@ -21,14 +21,12 @@ export const productService = {
    */
   async getAllProducts(): Promise<Product[]> {
     try {
-      // Buscar todos os produtos ordenados por nome
       const q = query(
         collection(db, 'products'),
         orderBy('name', 'asc')
       );
       const snapshot = await getDocs(q);
 
-      // Mapear todos os produtos
       const allProducts = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
         id: doc.id,
         ...doc.data() as Omit<Product, 'id'>,
@@ -59,7 +57,6 @@ export const productService = {
           id: snapshot.id,
           ...snapshot.data() as Omit<Product, 'id'>,
         };
-        // Verificar se está disponível
         if (product.stock <= 0) {
           return null;
         }
@@ -132,7 +129,6 @@ export const productService = {
         id: doc.id,
         ...doc.data() as Omit<Product, 'id'>,
       }));
-      // Filtrar por categoria e disponibilidade
       return products
         .filter(p => p.category === category && p.stock > 0)
         .filter((product, index, self) =>
