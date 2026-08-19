@@ -72,7 +72,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
               />
             ) : (
               <img
-                src={"../../assets/logo.jpg"}
+                src={"../logo.jpg"}
                 alt="Twendy Create Logo"
                 className="w-10 h-10 sm:w-12 sm:h-12 object-contain rounded-lg"
                 onError={() => setLogoError(true)}

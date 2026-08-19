@@ -4,8 +4,6 @@ import {
     query,
     where,
     onSnapshot,
-    orderBy,
-    limit
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { notificationService } from '../services/notificationService';
@@ -47,6 +45,7 @@ export const AdminNotificationProvider: React.FC<{ children: React.ReactNode }> 
     const [notifications, setNotifications] = useState<AdminNotification[]>([]);
     const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
     const previousOrdersRef = useRef<Set<string>>(new Set());
+    const isFirstLoadRef = useRef(true);
 
     const isAdmin = user?.role === 'admin';
 
@@ -61,19 +60,17 @@ export const AdminNotificationProvider: React.FC<{ children: React.ReactNode }> 
         const unsubscribe = onSnapshot(ordersQuery,
             (snapshot) => {
                 const currentIds = new Set<string>();
-
                 snapshot.forEach((doc) => {
                     currentIds.add(doc.id);
                 });
 
                 setPendingOrdersCount(snapshot.size);
 
-                if (previousOrdersRef.current.size > 0) {
-                    const newIds = [...currentIds].filter(id => !previousOrdersRef.current.has(id));
-                    if (newIds.length > 0) {
-                    }
+                if (isFirstLoadRef.current) {
+                    previousOrdersRef.current = currentIds;
+                    isFirstLoadRef.current = false;
+                    return;
                 }
-
                 previousOrdersRef.current = currentIds;
             },
             (error) => {
@@ -85,38 +82,14 @@ export const AdminNotificationProvider: React.FC<{ children: React.ReactNode }> 
     }, [isAdmin]);
 
     useEffect(() => {
-        if (!isAdmin) return;
+        if (!isAdmin) {
+            setNotifications([]);
+            return;
+        }
 
-        const notificationsQuery = query(
-            collection(db, 'adminNotifications'),
-            orderBy('createdAt', 'desc'),
-            limit(50)
-        );
-
-        const unsubscribe = onSnapshot(notificationsQuery,
-            (snapshot) => {
-                const notifs: AdminNotification[] = [];
-
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    notifs.push({
-                        id: doc.id,
-                        orderId: data.orderId,
-                        orderNumber: data.orderNumber,
-                        message: data.message,
-                        status: data.status,
-                        read: data.read || false,
-                        createdAt: data.createdAt,
-                        type: data.type || 'new_order',
-                    });
-                });
-
-                setNotifications(notifs);
-            },
-            (error) => {
-                console.error('Erro no listener de notificações:', error);
-            }
-        );
+        const unsubscribe = notificationService.onAdminNotifications((newNotifications) => {
+            setNotifications(newNotifications);
+        });
 
         return () => unsubscribe();
     }, [isAdmin]);
@@ -125,12 +98,19 @@ export const AdminNotificationProvider: React.FC<{ children: React.ReactNode }> 
 
     const markAsRead = useCallback(async (notificationId: string) => {
         await notificationService.markAsRead(notificationId);
+
+        setNotifications(prev =>
+            prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+        );
     }, []);
 
     const markAllAsRead = useCallback(async () => {
         const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
         if (unreadIds.length > 0) {
             await notificationService.markAllAsRead(unreadIds);
+            setNotifications(prev =>
+                prev.map(n => ({ ...n, read: true }))
+            );
         }
     }, [notifications]);
 
@@ -138,6 +118,7 @@ export const AdminNotificationProvider: React.FC<{ children: React.ReactNode }> 
         const allIds = notifications.map(n => n.id);
         if (allIds.length > 0) {
             await notificationService.clearAll(allIds);
+             setNotifications([]);
         }
     }, [notifications]);
 

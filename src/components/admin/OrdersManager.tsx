@@ -303,17 +303,28 @@ const OrdersManager: React.FC = () => {
     }, [filter, search]);
 
     const prevOrdersRef = useRef<Order[]>([]);
+    const isFirstLoadRef = useRef(true);
 
     const checkForNewOrders = (newOrders: Order[]) => {
-        if (prevOrdersRef.current.length > 0 && newOrders.length > prevOrdersRef.current.length) {
+        if (isFirstLoadRef.current) {
+            prevOrdersRef.current = newOrders;
+            isFirstLoadRef.current = false;
+            return;
+
+        }
+        if (newOrders.length > prevOrdersRef.current.length) {
             const prevIds = new Set(prevOrdersRef.current.map(o => o.id));
             const newOrdersList = newOrders.filter(o => !prevIds.has(o.id));
 
-            newOrdersList.forEach(newOrder => {
-                toast.success(`🛍️ Novo pedido #${newOrder.orderNumber} recebido!`, {
-                    duration: 8000,
-                    icon: <Package className="w-5 h-5 text-green-500" />,
-                });
+            newOrdersList.forEach(async (newOrder) => {
+                const exists = await notificationService.checkNotificationExists(newOrder.id, 'new_order');
+
+                if (!exists) {
+                    toast.success(`🛍️ Novo pedido #${newOrder.orderNumber} recebido!`, {
+                        duration: 8000,
+                        icon: <Package className="w-5 h-5 text-green-500" />,
+                    });
+                }
 
                 notificationService.saveAdminNotification({
                     orderId: newOrder.id,
@@ -325,26 +336,28 @@ const OrdersManager: React.FC = () => {
             });
         }
 
-        if (prevOrdersRef.current.length > 0) {
-            prevOrdersRef.current.forEach(prevOrder => {
-                const currentOrder = newOrders.find(o => o.id === prevOrder.id);
+        prevOrdersRef.current.forEach(async (prevOrder) => {
+            const currentOrder = newOrders.find(o => o.id === prevOrder.id);
 
-                if (currentOrder && !prevOrder.paymentProof && currentOrder.paymentProof) {
+            if (currentOrder && !prevOrder.paymentProof && currentOrder.paymentProof) {
+                const exists = await notificationService.checkNotificationExists(currentOrder.id, 'payment_proof');
+
+                if (!exists) {
                     toast.success(`📎 Comprovativo enviado - Pedido #${currentOrder.orderNumber}`, {
                         duration: 6000,
                         icon: <FileImage className="w-5 h-5 text-blue-500" />,
                     });
-
-                    notificationService.saveAdminNotification({
-                        orderId: currentOrder.id,
-                        orderNumber: currentOrder.orderNumber || currentOrder.id.slice(-8),
-                        message: `Comprovativo de pagamento enviado para o pedido #${currentOrder.orderNumber}`,
-                        type: 'payment_proof',
-                        status: currentOrder.status,
-                    });
                 }
-            });
-        }
+
+                notificationService.saveAdminNotification({
+                    orderId: currentOrder.id,
+                    orderNumber: currentOrder.orderNumber || currentOrder.id.slice(-8),
+                    message: `Comprovativo de pagamento enviado para o pedido #${currentOrder.orderNumber}`,
+                    type: 'payment_proof',
+                    status: currentOrder.status,
+                });
+            }
+        });
 
         prevOrdersRef.current = newOrders;
     };
@@ -916,8 +929,8 @@ const OrdersManager: React.FC = () => {
                                             </td>
                                             <td className="py-3 px-3 sm:px-4">
                                                 <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${paymentMethod === 'delivery'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : 'bg-blue-100 text-blue-700'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-blue-100 text-blue-700'
                                                     }`}>
                                                     {paymentMethod === 'delivery' ? (
                                                         <>

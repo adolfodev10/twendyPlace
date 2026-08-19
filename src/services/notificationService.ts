@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { db } from './firebase';
 
@@ -17,6 +17,33 @@ class NotificationService {
   private isInitialized = false;
   private pendingSounds: Array<{ type: 'notification' | 'success' | 'error' }> = [];
   private isMobile = false;
+
+  async checkNotificationExists(orderId: string, type?: string): Promise<boolean> {
+    try {
+      const notificationsRef = collection(db, 'adminNotification');
+      let q;
+
+      if (type) {
+        q = query(notificationsRef,
+          where('orderId', '==', orderId),
+          where('type', '==', type)
+        );
+      }
+      else {
+        q = query(
+          notificationsRef,
+          where('orderId', '==', orderId)
+        );
+      }
+      const snapshot = await getDocs(q);
+      return !snapshot.empty;
+    }
+    catch (error) {
+      console.error('Erro ao verificar notificação:', error);
+      return false;
+    }
+  }
+
 
   constructor() {
     this.isMobile = /Android|iPhone|iPad|iPod|BlackBerry|Opera Mini|IEMobile/i.test(navigator.userAgent);
@@ -275,6 +302,15 @@ class NotificationService {
 
   async saveAdminNotification(notification: AdminNotification) {
     try {
+      const exists = await this.checkNotificationExists(
+        notification.orderId,
+        notification.type
+      );
+
+      if (exists) {
+        return true;
+      }
+
       const notifRef = doc(collection(db, 'adminNotifications'));
       await setDoc(notifRef, {
         ...notification,
@@ -288,14 +324,14 @@ class NotificationService {
     }
   }
 
-   async getAdminNotifications(limitCount = 50) {
+  async getAdminNotifications(limitCount = 50) {
     try {
       const q = query(
         collection(db, 'adminNotifications'),
         orderBy('createdAt', 'desc'),
         limit(limitCount)
       );
-      
+
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
@@ -307,13 +343,13 @@ class NotificationService {
     }
   }
 
-    async getUnreadCount(): Promise<number> {
+  async getUnreadCount(): Promise<number> {
     try {
       const q = query(
         collection(db, 'adminNotifications'),
         where('read', '==', false)
       );
-      
+
       const snapshot = await getDocs(q);
       return snapshot.size;
     } catch (error) {
@@ -322,11 +358,12 @@ class NotificationService {
     }
   }
 
-   async markAsRead(notificationId: string) {
+  async markAsRead(notificationId: string) {
     try {
       const { doc, updateDoc } = await import('firebase/firestore');
       await updateDoc(doc(db, 'adminNotifications', notificationId), {
         read: true,
+        readAt: serverTimestamp(),
       });
       return true;
     } catch (error) {
@@ -339,7 +376,7 @@ class NotificationService {
     try {
       const { writeBatch, doc } = await import('firebase/firestore');
       const batch = writeBatch(db);
-      
+
       notificationIds.forEach(id => {
         const notifRef = doc(db, 'adminNotifications', id);
         batch.update(notifRef, { read: true });
@@ -353,11 +390,11 @@ class NotificationService {
     }
   }
 
-   async clearAll(notificationIds: string[]) {
+  async clearAll(notificationIds: string[]) {
     try {
       const { writeBatch, doc } = await import('firebase/firestore');
       const batch = writeBatch(db);
-      
+
       notificationIds.forEach(id => {
         const notifRef = doc(db, 'adminNotifications', id);
         batch.delete(notifRef);
@@ -370,6 +407,23 @@ class NotificationService {
       return false;
     }
   }
+
+  onAdminNotifications(callback: (notifications: any[]) => void) {
+    const q = query(
+      collection(db, 'adminNotifications'),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      const notifications = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      callback(notifications);
+    });
+  }
+
 
 
   private sendBrowserNotification(message: string, options?: {
@@ -412,6 +466,7 @@ class NotificationService {
       console.debug('Erro ao enviar notificação:', error);
     }
   }
+
 
   toggleSound(enabled: boolean) {
     this.isSoundEnabled = enabled;
@@ -458,7 +513,5 @@ export const showNotification = (
 ) => {
   notificationService.showNotification(message, options);
 };
-
-
 
 export default notificationService;
