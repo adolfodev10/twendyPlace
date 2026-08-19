@@ -5,6 +5,7 @@ import { User as UserType } from '../../types';
 import { authService } from '../../services/authService';
 import toast from 'react-hot-toast';
 
+const logo = '/logo.jpg';
 
 interface HeaderProps {
   cartCount: number;
@@ -58,7 +59,6 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
     setIsUserDropdownOpen(false);
   };
 
-
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -67,7 +67,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
           <Link to="/" className="flex items-center gap-3">
             {!logoError ? (
               <img
-                src='https://picsum.photos/100'
+                src={logo}
                 alt="Twendy Create"
                 className="w-10 h-10 sm:w-12 sm:h-12 object-contain rounded-lg"
                 onError={() => setLogoError(true)}
