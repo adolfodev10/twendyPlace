@@ -49,6 +49,7 @@ const UserAvatar: React.FC<{ user: UserType }> = ({ user }) => {
 const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   const handleLogout = async () => {
     await authService.logout();
@@ -60,17 +61,20 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo atualizado */}
+          {/* Logo */}
           <Link to="/" className="flex items-center gap-3">
-            <img
-              src="/logo.jpg"
-              alt="Twendy Create Logo"
-              className="w-10 h-10 sm:w-12 sm:h-12 object-contain rounded-lg"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-              }}
-            />
+            {!logoError ? (
+              <img
+                src="/logo.jpg"
+                alt="Twendy Create"
+                className="w-10 h-10 sm:w-12 sm:h-12 object-contain rounded-lg"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xl">TC</span>
+              </div>
+            )}
           </Link>
 
           <div className="hidden md:flex items-center gap-4">
