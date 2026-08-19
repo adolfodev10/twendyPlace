@@ -5,6 +5,8 @@ import { User as UserType } from '../../types';
 import { authService } from '../../services/authService';
 import toast from 'react-hot-toast';
 
+const logo = '/logo.jpg';
+
 interface HeaderProps {
   cartCount: number;
   onCartClick: () => void;
@@ -65,7 +67,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, user }) => {
           <Link to="/" className="flex items-center gap-3">
             {!logoError ? (
               <img
-                src="/logo.jpg"
+                src={logo}
                 alt="Twendy Create"
                 className="w-10 h-10 sm:w-12 sm:h-12 object-contain rounded-lg"
                 onError={() => setLogoError(true)}
