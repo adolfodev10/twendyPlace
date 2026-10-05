@@ -10,10 +10,11 @@ import {
   X,
   FileImage,
   Users2,
-  UserCircle
+  UserCircle,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/authService';
+import AdminNotificationBell from '../AdminNotificationBell';
 import toast from 'react-hot-toast';
 
 interface AdminLayoutProps {
@@ -27,18 +28,14 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   useEffect(() => {
-    if (isMobile) {
-      setIsSidebarOpen(false);
-    }
+    if (isMobile) setIsSidebarOpen(false);
   }, [location.pathname, isMobile]);
 
   const navItems = [
@@ -48,7 +45,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { path: '/admin/clients', icon: Users, label: 'Clientes' },
     { path: '/admin/users', icon: UserCircle, label: 'Usuários' },
     { path: '/admin/proofPayment', icon: FileImage, label: 'Comprovativos' },
-    { path: '/admin/partners', icon: Users2, label: 'Parceiros' }
+    { path: '/admin/partners', icon: Users2, label: 'Parceiros' },
   ];
 
   const handleLogout = async () => {
@@ -57,68 +54,55 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     setIsSidebarOpen(false);
   };
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
-  const closeSidebar = () => {
-    setIsSidebarOpen(false);
-  };
+  const closeSidebar = () => setIsSidebarOpen(false);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between shadow-sm">
-        <button
-          onClick={toggleSidebar}
-          className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          aria-label="Abrir menu"
-        >
-          <Menu className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
-        </button>
-        <Link to="/" className="flex items-center gap-1.5 sm:gap-2">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xs sm:text-sm">T</span>
-          </div>
-          <span className="font-bold text-gray-900 text-sm sm:text-base">Admin</span>
-        </Link>
-        <div className="w-8 sm:w-10" /> {/* Spacer para centralizar */}
-      </header>
-
-      {/* Overlay para mobile */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/40 flex">
+      {/* ==================== OVERLAY MOBILE ==================== */}
       {isSidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-40 animate-fadeIn"
+          className="lg:hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 animate-fadeIn"
           onClick={closeSidebar}
         />
       )}
 
-      {/* Sidebar */}
-      <aside className={`
-        fixed top-0 left-0 h-full w-[280px] sm:w-72 bg-white border-r border-gray-200 flex flex-col z-50
-        transition-transform duration-300 ease-in-out shadow-lg lg:shadow-none
-        lg:translate-x-0 lg:static lg:w-64
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        {/* Sidebar Header */}
-        <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2" onClick={closeSidebar}>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+      {/* ==================== SIDEBAR ==================== */}
+      <aside
+        className={`
+          fixed lg:sticky top-0 left-0 h-screen w-[280px] lg:w-64
+          bg-white/95 backdrop-blur-xl border-r border-slate-200/70
+          flex flex-col z-50 shadow-xl lg:shadow-none
+          transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+      >
+        {/* Logo */}
+        <div className="p-4 border-b border-slate-200/70 flex items-center justify-between flex-shrink-0">
+          <Link to="/" className="flex items-center gap-2.5 group" onClick={closeSidebar}>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
               <span className="text-white font-bold text-sm">T</span>
             </div>
-            <span className="font-bold text-gray-900 text-sm sm:text-base">Admin</span>
+            <div>
+              <p className="font-bold text-slate-900 text-sm tracking-tight leading-tight">
+                Twendy Create
+              </p>
+              <p className="text-[10px] text-slate-400 font-medium">Painel Admin</p>
+            </div>
           </Link>
           <button
             onClick={closeSidebar}
-            className="lg:hidden p-1 hover:bg-gray-100 rounded-lg transition-colors"
+            className="lg:hidden p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
             aria-label="Fechar menu"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-4 h-4 text-slate-500" />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 sm:p-4 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          <p className="px-3 pt-2 pb-2 text-[10px] font-bold text-slate-400 tracking-wider">
+            MENU PRINCIPAL
+          </p>
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -127,71 +111,100 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 to={item.path}
                 onClick={closeSidebar}
                 className={`
-                  flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-all
-                  ${isActive
-                    ? 'bg-primary-50 text-primary-600 shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-100 hover:translate-x-1'
+                  group relative flex items-center gap-3 px-3 py-2.5 rounded-xl
+                  transition-all duration-200
+                  ${
+                    isActive
+                      ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-sm shadow-blue-100'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }
                 `}
               >
-                <item.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${isActive ? 'text-primary-600' : 'text-gray-500'}`} />
-                <span className={`font-medium text-sm sm:text-base ${isActive ? 'text-primary-600' : 'text-gray-700'}`}>
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-r-full" />
+                )}
+                <item.icon
+                  className={`w-4 h-4 flex-shrink-0 transition-colors ${
+                    isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'
+                  }`}
+                />
+                <span
+                  className={`font-medium text-sm ${
+                    isActive ? 'text-blue-700 font-semibold' : ''
+                  }`}
+                >
                   {item.label}
                 </span>
-                {isActive && (
-                  <span className="ml-auto w-1 h-6 bg-primary-600 rounded-full" />
-                )}
               </Link>
             );
           })}
         </nav>
 
         {/* User Profile */}
-        <div className="p-3 sm:p-4 border-t border-gray-200">
-          <div className="flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-50 rounded-lg">
+        <div className="p-3 border-t border-slate-200/70 flex-shrink-0">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/50 border border-slate-200/60">
             <img
-              src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.name || 'Admin'}&background=2563eb&color=fff&size=64`}
+              src={
+                user?.avatar ||
+                `https://ui-avatars.com/api/?name=${user?.name || 'Admin'}&background=2563eb&color=fff&size=64`
+              }
               alt={user?.name}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border-2 border-white shadow-sm"
+              className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm"
             />
             <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{user?.name || 'Admin'}</p>
-              <p className="text-[10px] sm:text-xs text-gray-500 truncate">Administrador</p>
+              <p className="text-xs font-bold text-slate-900 truncate">
+                {user?.name || 'Admin'}
+              </p>
+              <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Online
+              </p>
             </div>
           </div>
+
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-3 sm:px-4 py-2 mt-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 rounded-lg w-full transition-colors"
+            className="group flex items-center gap-2 px-3 py-2 mt-2 text-sm text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-xl w-full transition-all duration-200"
           >
-            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            Sair
+            <LogOut className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <span className="font-medium">Sair da conta</span>
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className={`
-        transition-all duration-300
-        lg:ml-64
-        lg:-mt-[440px]
-        ${isSidebarOpen && !isMobile ? 'ml-[280px] sm:ml-72' : 'ml-0'}
-      `}>
-        {/* Espaço para o header mobile */}
-        <div className="lg:hidden h-14 sm:h-16" />
-        <div className="p-3 sm:p-4 md:p-6 lg:p-8">
-          {children}
-        </div>
-      </main>
+      {/* ==================== MAIN ==================== */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top bar (mobile menu + notificações) */}
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200/70">
+          <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-14">
+            {/* Menu button (mobile) */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="lg:hidden p-2 -ml-2 hover:bg-slate-100 rounded-xl transition-colors"
+              aria-label="Abrir menu"
+            >
+              <Menu className="w-5 h-5 text-slate-700" />
+            </button>
 
-      {/* Estilos para animação */}
+            {/* Espaço vazio no desktop (o sidebar já tem o logo) */}
+            <div className="hidden lg:block" />
+
+            {/* Notificações + avatar */}
+            <div className="flex items-center gap-2">
+              <AdminNotificationBell />
+            </div>
+          </div>
+        </header>
+
+        {/* Conteúdo */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">
+          {children}
+        </main>
+      </div>
+
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-in-out;
-        }
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-in-out }
       `}</style>
     </div>
   );

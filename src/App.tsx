@@ -3,7 +3,6 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import { AdminNotificationProvider } from './contexts/AdminNotificationContext';
-import AdminNotificationBell from './components/AdminNotificationBell';
 
 import Store from './pages/Store';
 import AdminDashboard from './pages/AdminDashboard';
@@ -27,7 +26,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <header className="bg-white sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 py-2 sm:px-6 lg:px-8">
             <div className="flex items-center justify-end">
-              {isAdmin && <AdminNotificationBell />}
+              {isAdmin}
             </div>
           </div>
         </header>
