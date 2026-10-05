@@ -1,8 +1,79 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Product } from '../../types';
 import { productService } from '../../services/productService';
-import { Plus, Edit, Trash2, Search, X, Save, AlertTriangle, Package, AlertCircle, CheckSquare, Square } from 'lucide-react';
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Search,
+  X,
+  Save,
+  AlertTriangle,
+  Package,
+  AlertCircle,
+  CheckSquare,
+  Square,
+  Star,
+  Layers,
+  Tag,
+  DollarSign,
+  Image as ImageIcon,
+  FileText,
+  Boxes,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
+
+/* ============================ SUBCOMPONENTES ============================ */
+
+const ModalShell: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+  zIndex?: string;
+}> = ({ isOpen, onClose, children, size = 'md', zIndex = 'z-50' }) => {
+  if (!isOpen) return null;
+  const maxW = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-xl' }[size];
+
+  return (
+    <div className={`fixed inset-0 ${zIndex} flex items-center justify-center p-3 sm:p-4`}>
+      <div
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-fadeIn"
+        onClick={onClose}
+      />
+      <div
+        className={`relative bg-white/95 backdrop-blur-xl rounded-3xl ${maxW} w-full shadow-2xl shadow-slate-900/20 border border-slate-200/70 animate-modalSlideUp max-h-[95vh] overflow-y-auto`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const InputField: React.FC<{
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  required?: boolean;
+  children: React.ReactNode;
+}> = ({ id, label, icon: Icon, required, children }) => (
+  <div>
+    <label
+      htmlFor={id}
+      className="block text-[11px] font-semibold text-slate-700 mb-1.5 tracking-wide"
+    >
+      {label} {required && <span className="text-red-500">*</span>}
+    </label>
+    <div className="relative group">
+      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
+        <Icon className="h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+      </div>
+      {children}
+    </div>
+  </div>
+);
+
+/* ============================ COMPONENTE PRINCIPAL ============================ */
 
 const ProductsManager: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -30,9 +101,7 @@ const ProductsManager: React.FC = () => {
   const [selectAll, setSelectAll] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
-  const sanitizeInput = (input: string) => {
-    return input.replace(/[<>]/g, '').trim();
-  };
+  const sanitizeInput = (input: string) => input.replace(/[<>]/g, '').trim();
 
   useEffect(() => {
     loadProducts();
@@ -48,26 +117,38 @@ const ProductsManager: React.FC = () => {
     try {
       const data = await productService.getAllProducts();
       setProducts(data);
-      const zeroStock = data.filter(p => p.stock === 0);
+      const zeroStock = data.filter((p) => p.stock === 0);
       setOutOfStockCount(zeroStock.length);
 
       if (zeroStock.length > 0) {
-        toast.custom((t) => (
-          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-[90vw] sm:max-w-md w-full bg-yellow-50 border border-yellow-200 shadow-lg rounded-xl pointer-events-auto flex items-start gap-3 p-3 sm:p-4`}>
-            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-yellow-800">
-                ⚠️ {zeroStock.length} produto{zeroStock.length > 1 ? 's' : ''} com estoque zerado!
-              </p>
-              <p className="text-[10px] sm:text-xs text-yellow-600 mt-0.5">
-                Eles não aparecem na loja para clientes.
-              </p>
+        toast.custom(
+          (t) => (
+            <div
+              className={`${
+                t.visible ? 'animate-enter' : 'animate-leave'
+              } max-w-[90vw] sm:max-w-md w-full bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 shadow-xl shadow-amber-200/50 rounded-2xl pointer-events-auto flex items-start gap-3 p-4`}
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-amber-200">
+                <AlertTriangle className="w-4.5 h-4.5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-amber-900">
+                  {zeroStock.length} produto{zeroStock.length > 1 ? 's' : ''} com estoque zerado
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                  Eles não aparecem na loja para clientes. Recomendamos reabastecer.
+                </p>
+              </div>
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="text-amber-500 hover:text-amber-700 flex-shrink-0 p-1 hover:bg-amber-100 rounded-lg transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <button onClick={() => toast.dismiss(t.id)} className="text-yellow-500 hover:text-yellow-700 flex-shrink-0">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        ), { duration: 8000 });
+          ),
+          { duration: 8000 }
+        );
       }
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
@@ -121,9 +202,11 @@ const ProductsManager: React.FC = () => {
     setProductToDelete(null);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: type === 'number' ? parseFloat(value) || 0 : value,
     }));
@@ -132,26 +215,11 @@ const ProductsManager: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim()) {
-      toast.error('Nome do produto é obrigatório');
-      return;
-    }
-    if (formData.price <= 0) {
-      toast.error('Preço deve ser maior que zero');
-      return;
-    }
-    if (!formData.category) {
-      toast.error('Selecione uma categoria');
-      return;
-    }
-    if (!formData.brand) {
-      toast.error('Selecione uma marca');
-      return;
-    }
-    if (!formData.image.trim()) {
-      toast.error('URL da imagem é obrigatória');
-      return;
-    }
+    if (!formData.name.trim()) return toast.error('Nome do produto é obrigatório');
+    if (formData.price <= 0) return toast.error('Preço deve ser maior que zero');
+    if (!formData.category) return toast.error('Selecione uma categoria');
+    if (!formData.brand) return toast.error('Selecione uma marca');
+    if (!formData.image.trim()) return toast.error('URL da imagem é obrigatória');
 
     setSaving(true);
     try {
@@ -166,12 +234,9 @@ const ProductsManager: React.FC = () => {
         description: sanitizeInput(formData.description),
       };
 
-      let result;
-      if (editingProduct) {
-        result = await productService.updateProduct(editingProduct.id, productData);
-      } else {
-        result = await productService.addProduct(productData);
-      }
+      const result = editingProduct
+        ? await productService.updateProduct(editingProduct.id, productData)
+        : await productService.addProduct(productData);
 
       if (result.success) {
         toast.success(editingProduct ? 'Produto atualizado!' : 'Produto criado!');
@@ -190,7 +255,6 @@ const ProductsManager: React.FC = () => {
 
   const handleDelete = async () => {
     if (!productToDelete) return;
-
     setDeleting(true);
     try {
       const result = await productService.deleteProduct(productToDelete.id);
@@ -211,22 +275,17 @@ const ProductsManager: React.FC = () => {
 
   const executeBulkDelete = async () => {
     if (selectedProducts.size === 0) return;
-
     setDeleting(true);
     let successCount = 0;
     let errorCount = 0;
 
     try {
       const productIds = Array.from(selectedProducts);
-
       for (const productId of productIds) {
         try {
           const result = await productService.deleteProduct(productId);
-          if (result.success) {
-            successCount++;
-          } else {
-            errorCount++;
-          }
+          if (result.success) successCount++;
+          else errorCount++;
         } catch (error) {
           errorCount++;
           console.error(`Erro ao excluir produto ${productId}:`, error);
@@ -237,12 +296,10 @@ const ProductsManager: React.FC = () => {
       setSelectAll(false);
       setShowBulkDeleteModal(false);
 
-      if (successCount > 0) {
+      if (successCount > 0)
         toast.success(`${successCount} produto(s) excluído(s) com sucesso!`);
-      }
-      if (errorCount > 0) {
+      if (errorCount > 0)
         toast.error(`${errorCount} produto(s) não puderam ser excluídos`);
-      }
 
       loadProducts();
     } catch (error) {
@@ -254,14 +311,11 @@ const ProductsManager: React.FC = () => {
   };
 
   const toggleProductSelection = (productId: string) => {
-    setSelectedProducts(prev => {
-      const newSelected = new Set(prev);
-      if (newSelected.has(productId)) {
-        newSelected.delete(productId);
-      } else {
-        newSelected.add(productId);
-      }
-      return newSelected;
+    setSelectedProducts((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
     });
   };
 
@@ -270,8 +324,7 @@ const ProductsManager: React.FC = () => {
       setSelectedProducts(new Set());
       setSelectAll(false);
     } else {
-      const allIds = new Set(filteredProducts.map(product => product.id));
-      setSelectedProducts(allIds);
+      setSelectedProducts(new Set(filteredProducts.map((p) => p.id)));
       setSelectAll(true);
     }
   };
@@ -285,10 +338,11 @@ const ProductsManager: React.FC = () => {
   };
 
   const filteredProducts = useMemo(() => {
-    return products.filter(product =>
-      product.name.toLowerCase().includes(search.toLowerCase()) ||
-      product.brand.toLowerCase().includes(search.toLowerCase()) ||
-      product.category.toLowerCase().includes(search.toLowerCase())
+    return products.filter(
+      (product) =>
+        product.name.toLowerCase().includes(search.toLowerCase()) ||
+        product.brand.toLowerCase().includes(search.toLowerCase()) ||
+        product.category.toLowerCase().includes(search.toLowerCase())
     );
   }, [products, search]);
 
@@ -300,246 +354,397 @@ const ProductsManager: React.FC = () => {
     }
   }, [selectedProducts, filteredProducts]);
 
+  /* ============================ LOADING ============================ */
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="flex flex-col items-center justify-center h-96 gap-4">
+        <div className="relative">
+          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 blur-xl opacity-30 animate-pulse" />
+          <div className="relative w-12 h-12 rounded-full border-4 border-slate-200 border-t-blue-600 animate-spin" />
+        </div>
+        <p className="text-slate-500 text-sm font-medium">Carregando produtos...</p>
       </div>
     );
   }
 
+  /* ============================ RENDER ============================ */
   return (
-    <div className="px-2 sm:px-0 lg:-mt-32">
-      {/* Banner de Produtos Esgotados */}
+    <div className="w-full">
+      {/* ==================== HEADER ==================== */}
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/70 backdrop-blur-sm border border-blue-100 shadow-sm mb-3">
+              <Package className="w-3.5 h-3.5 text-blue-600" />
+              <span className="text-[11px] font-bold text-blue-700 tracking-wide">
+                CATÁLOGO
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Produtos
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Gerencie o catálogo, estoque e disponibilidade dos produtos.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {selectedProducts.size > 0 && (
+              <button
+                onClick={openBulkDeleteModal}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl hover:shadow-lg hover:shadow-red-200 hover:-translate-y-0.5 transition-all font-semibold text-sm shadow-sm"
+              >
+                <Trash2 className="w-4 h-4" />
+                Excluir ({selectedProducts.size})
+              </button>
+            )}
+            <button
+              onClick={() => handleOpenModal()}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-200 hover:-translate-y-0.5 transition-all font-semibold text-sm shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Novo produto
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ==================== ALERTA ESTOQUE ==================== */}
       {outOfStockCount > 0 && (
-        <div className="mb-4 p-3 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-center justify-between flex-wrap gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs sm:text-sm font-semibold text-yellow-800">
+        <div className="mb-5 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/70 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-amber-200">
+              <AlertCircle className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-900">
                 {outOfStockCount} produto{outOfStockCount > 1 ? 's' : ''} com estoque zerado
               </p>
-              <p className="text-[10px] sm:text-xs text-yellow-700 hidden sm:block">
-                Estes produtos não aparecem na loja para clientes. Recomendamos reabastecer ou ocultar.
+              <p className="text-xs text-amber-700 mt-0.5">
+                Não aparecem na loja. Reabasteça ou oculte-os.
               </p>
             </div>
           </div>
           <button
             onClick={() => {
-              setSearch('');
-              const zeroStockProducts = products.filter(p => p.stock === 0);
+              const zeroStockProducts = products.filter((p) => p.stock === 0);
               if (zeroStockProducts.length > 0) {
                 toast.success(`${zeroStockProducts.length} produtos com estoque zero`);
               }
             }}
-            className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 rounded-lg transition-colors flex-shrink-0"
+            className="px-4 py-2 text-xs font-bold text-amber-800 bg-white/70 hover:bg-white border border-amber-200 rounded-xl transition-colors shadow-sm"
           >
             Ver todos
           </button>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2 flex-wrap">
-          <Package className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600" />
-          <span className="truncate">Gerenciar Produtos</span>
-          {outOfStockCount > 0 && (
-            <span className="text-xs sm:text-sm font-normal text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
-              {outOfStockCount} esgotados
+      {/* ==================== BUSCA ==================== */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/70 shadow-sm p-4 mb-5">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1">
+            <div className="relative group">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+              <input
+                type="text"
+                placeholder="Buscar por nome, marca ou categoria..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 bg-white/60 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300 outline-none text-sm font-medium transition-all text-slate-900 placeholder-slate-400"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+            <Layers className="w-4 h-4 text-slate-400" />
+            <span className="text-sm text-slate-500 whitespace-nowrap">
+              <strong className="text-slate-900 font-bold">{filteredProducts.length}</strong> produtos
             </span>
-          )}
-        </h1>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          {selectedProducts.size > 0 && (
-            <button
-              onClick={openBulkDeleteModal}
-              className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs sm:text-sm"
-            >
-              <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Excluir</span> ({selectedProducts.size})
-            </button>
-          )}
-          <button
-            onClick={() => handleOpenModal()}
-            className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-xs sm:text-sm"
-          >
-            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="hidden sm:inline">Novo Produto</span>
-            <span className="sm:hidden">Novo</span>
-          </button>
+          </div>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 mb-4 sm:mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar produtos..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-xs sm:text-sm"
-          />
-        </div>
-      </div>
-
-      {/* Products Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {/* Mobile: Card View */}
-        <div className="block sm:hidden">
+      {/* ==================== TABELA / CARDS ==================== */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/70 shadow-sm overflow-hidden">
+        {/* ===== MOBILE (cards) ===== */}
+        <div className="block lg:hidden divide-y divide-slate-100">
           {filteredProducts.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 text-sm">
-              Nenhum produto encontrado
+            <div className="text-center py-16 px-4">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
+                <Package className="w-6 h-6 text-slate-400" />
+              </div>
+              <p className="text-sm font-semibold text-slate-700">Nenhum produto encontrado</p>
+              <p className="text-xs text-slate-400 mt-1">Tente ajustar a busca</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
-              {filteredProducts.map(product => {
-                const isOutOfStock = product.stock === 0;
-                const isSelected = selectedProducts.has(product.id);
-                return (
-                  <div key={product.id} className={`p-3 ${isSelected ? 'bg-primary-50' : ''} ${isOutOfStock ? 'bg-yellow-50/30' : ''}`}>
-                    <div className="flex items-start gap-3">
-                      <button
-                        onClick={() => toggleProductSelection(product.id)}
-                        className="mt-1 flex-shrink-0"
-                      >
-                        {isSelected ? (
-                          <CheckSquare className="w-5 h-5 text-primary-600" />
-                        ) : (
-                          <Square className="w-5 h-5 text-gray-400" />
-                        )}
-                      </button>
+            filteredProducts.map((product) => {
+              const isOutOfStock = product.stock === 0;
+              const isSelected = selectedProducts.has(product.id);
+              return (
+                <div
+                  key={product.id}
+                  className={`p-4 transition-colors ${
+                    isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50/60'
+                  } ${isOutOfStock && !isSelected ? 'bg-amber-50/40' : ''}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <button
+                      onClick={() => toggleProductSelection(product.id)}
+                      className="mt-1 flex-shrink-0 hover:bg-slate-200/70 rounded-md p-0.5 transition-colors"
+                    >
+                      {isSelected ? (
+                        <CheckSquare className="w-5 h-5 text-blue-600" />
+                      ) : (
+                        <Square className="w-5 h-5 text-slate-400" />
+                      )}
+                    </button>
+
+                    <div className="relative flex-shrink-0">
                       <img
                         src={product.image}
                         alt={product.name}
-                        className="w-14 h-14 rounded-lg object-cover border border-gray-200 flex-shrink-0"
+                        className="w-14 h-14 rounded-xl object-cover border-2 border-white shadow-sm"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/56/2563eb/ffffff?text=P';
+                          (e.target as HTMLImageElement).src =
+                            'https://via.placeholder.com/56/2563eb/ffffff?text=P';
                         }}
                       />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium text-gray-900 text-sm truncate">{product.name}</p>
-                          {isOutOfStock && (
-                            <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded">ESGOTADO</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">{product.brand} • {product.category}</p>
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="font-semibold text-sm">Kz {product.price.toFixed(2)}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${isOutOfStock ? 'bg-red-100 text-red-700' : product.stock > 10 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {product.stock} un.
+                      {isOutOfStock && (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 border-2 border-white" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-slate-900 text-sm truncate">
+                          {product.name}
+                        </p>
+                        {isOutOfStock && (
+                          <span className="px-1.5 py-0.5 bg-red-50 text-red-700 border border-red-200 text-[9px] font-bold rounded-md">
+                            ESGOTADO
                           </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-yellow-500 text-xs">{'★'.repeat(product.rating)}</span>
-                          <div className="flex gap-1 ml-auto">
-                            <button onClick={() => handleOpenModal(product)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg">
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleOpenDeleteModal(product)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                        {product.brand} · {product.category}
+                      </p>
+
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="font-bold text-sm text-slate-900">
+                          Kz {product.price.toFixed(2)}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            isOutOfStock
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : product.stock > 10
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
+                        >
+                          {product.stock} un.
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-2.5">
+                        <span className="text-amber-500 text-xs flex items-center gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-3 h-3 ${
+                                i < product.rating
+                                  ? 'fill-amber-400 text-amber-400'
+                                  : 'text-slate-300'
+                              }`}
+                            />
+                          ))}
+                        </span>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleOpenModal(product)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenDeleteModal(product)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })
           )}
         </div>
 
-        {/* Desktop: Table View */}
-        <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full min-w-[750px]">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 w-12">
-                  <button onClick={toggleSelectAll} className="hover:bg-gray-200 rounded p-0.5 transition-colors">
-                    {selectAll ? <CheckSquare className="w-4 h-4 text-primary-600" /> : <Square className="w-4 h-4 text-gray-400" />}
+        {/* ===== DESKTOP (tabela) ===== */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-slate-50/70 border-b border-slate-200/70">
+                <th className="text-left py-3.5 px-4 text-[11px] font-bold text-slate-500 tracking-wider uppercase w-12">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="hover:bg-slate-200/70 rounded-md p-1 transition-colors"
+                  >
+                    {selectAll ? (
+                      <CheckSquare className="w-4 h-4 text-blue-600" />
+                    ) : (
+                      <Square className="w-4 h-4 text-slate-400" />
+                    )}
                   </button>
                 </th>
-                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">Produto</th>
-                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 hidden md:table-cell">Categoria</th>
-                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 hidden lg:table-cell">Marca</th>
-                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">Preço</th>
-                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">Estoque</th>
-                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500 hidden xl:table-cell">Avaliação</th>
-                <th className="text-left py-3 px-3 sm:px-4 text-xs font-medium text-gray-500">Ações</th>
+                <th className="text-left py-3.5 px-4 text-[11px] font-bold text-slate-500 tracking-wider uppercase">
+                  <Package className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+                  Produto
+                </th>
+                <th className="text-left py-3.5 px-4 text-[11px] font-bold text-slate-500 tracking-wider uppercase">
+                  <Tag className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+                  Categoria
+                </th>
+                <th className="text-left py-3.5 px-4 text-[11px] font-bold text-slate-500 tracking-wider uppercase">
+                  <DollarSign className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+                  Preço
+                </th>
+                <th className="text-left py-3.5 px-4 text-[11px] font-bold text-slate-500 tracking-wider uppercase">
+                  <Boxes className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+                  Estoque
+                </th>
+                <th className="text-left py-3.5 px-4 text-[11px] font-bold text-slate-500 tracking-wider uppercase">
+                  <Star className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+                  Avaliação
+                </th>
+                <th className="text-left py-3.5 px-4 text-[11px] font-bold text-slate-500 tracking-wider uppercase">
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody>
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-gray-500">
-                    Nenhum produto encontrado
+                  <td colSpan={7} className="text-center py-16">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
+                      <Package className="w-6 h-6 text-slate-400" />
+                    </div>
+                    <p className="text-sm font-semibold text-slate-700">Nenhum produto encontrado</p>
+                    <p className="text-xs text-slate-400 mt-1">Tente ajustar a busca</p>
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map(product => {
+                filteredProducts.map((product) => {
                   const isOutOfStock = product.stock === 0;
                   const isSelected = selectedProducts.has(product.id);
                   return (
-                    <tr key={product.id} className={`border-b border-gray-100 transition-colors ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'} ${isOutOfStock ? 'bg-yellow-50/30' : ''}`}>
-                      <td className="py-3 px-3 sm:px-4">
-                        <button onClick={() => toggleProductSelection(product.id)} className="hover:bg-gray-200 rounded p-0.5 transition-colors">
-                          {isSelected ? <CheckSquare className="w-4 h-4 text-primary-600" /> : <Square className="w-4 h-4 text-gray-400" />}
+                    <tr
+                      key={product.id}
+                      className={`border-b border-slate-100 transition-colors ${
+                        isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50/60'
+                      } ${isOutOfStock && !isSelected ? 'bg-amber-50/40' : ''}`}
+                    >
+                      <td className="py-3.5 px-4">
+                        <button
+                          onClick={() => toggleProductSelection(product.id)}
+                          className="hover:bg-slate-200/70 rounded-md p-1 transition-colors"
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-blue-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400" />
+                          )}
                         </button>
                       </td>
-                      <td className="py-3 px-3 sm:px-4">
+
+                      <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={product.image}
-                            alt={product.name}
-                            className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-gray-200"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/48/2563eb/ffffff?text=Product';
-                            }}
-                          />
+                          <div className="relative flex-shrink-0">
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              className="w-11 h-11 rounded-xl object-cover border-2 border-white shadow-sm"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src =
+                                  'https://via.placeholder.com/48/2563eb/ffffff?text=P';
+                              }}
+                            />
+                            {isOutOfStock && (
+                              <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 border-2 border-white" />
+                            )}
+                          </div>
                           <div className="min-w-0">
-                            <p className="font-medium text-gray-900 text-sm truncate max-w-[120px] sm:max-w-[200px]">
+                            <p className="font-bold text-slate-900 text-sm truncate max-w-[220px]">
                               {product.name}
                             </p>
-                            <p className="text-xs text-gray-500 truncate md:hidden">{product.brand} • {product.category}</p>
+                            <p className="text-[11px] text-slate-500 truncate max-w-[220px]">
+                              {product.brand}
+                            </p>
                           </div>
                           {isOutOfStock && (
-                            <span className="ml-1 px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded hidden sm:inline">
+                            <span className="ml-1 px-1.5 py-0.5 bg-red-50 text-red-700 border border-red-200 text-[9px] font-bold rounded-md">
                               ESGOTADO
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-3 px-3 sm:px-4 hidden md:table-cell">
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium whitespace-nowrap">
+
+                      <td className="py-3.5 px-4">
+                        <span className="inline-block px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-[11px] font-bold whitespace-nowrap">
                           {product.category}
                         </span>
                       </td>
-                      <td className="py-3 px-3 sm:px-4 text-gray-600 text-sm hidden lg:table-cell">
-                        {product.brand}
+
+                      <td className="py-3.5 px-4">
+                        <span className="font-bold text-slate-900 text-sm whitespace-nowrap">
+                          Kz {product.price.toFixed(2)}
+                        </span>
                       </td>
-                      <td className="py-3 px-3 sm:px-4 font-semibold text-gray-900 text-sm whitespace-nowrap">
-                        Kz {product.price.toFixed(2)}
-                      </td>
-                      <td className="py-3 px-3 sm:px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${isOutOfStock ? 'bg-red-100 text-red-700 animate-pulse' : product.stock > 10 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold border whitespace-nowrap ${
+                            isOutOfStock
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : product.stock > 10
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
+                        >
                           {product.stock} un.
                         </span>
                       </td>
-                      <td className="py-3 px-3 sm:px-4 hidden xl:table-cell">
-                        <span className="text-yellow-500 text-sm whitespace-nowrap">
-                          {'★'.repeat(product.rating)}{'☆'.repeat(5 - product.rating)}
+
+                      <td className="py-3.5 px-4">
+                        <span className="text-amber-500 text-xs flex items-center gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-3.5 h-3.5 ${
+                                i < product.rating
+                                  ? 'fill-amber-400 text-amber-400'
+                                  : 'text-slate-300'
+                              }`}
+                            />
+                          ))}
                         </span>
                       </td>
-                      <td className="py-3 px-3 sm:px-4">
-                        <div className="flex items-center gap-1 sm:gap-2">
-                          <button onClick={() => handleOpenModal(product)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenModal(product)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Editar"
+                          >
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button onClick={() => handleOpenDeleteModal(product)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                          <button
+                            onClick={() => handleOpenDeleteModal(product)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Excluir"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -552,18 +757,34 @@ const ProductsManager: React.FC = () => {
           </table>
         </div>
 
-        {/* Barra de seleção */}
+        {/* ==================== BARRA DE SELEÇÃO ==================== */}
         {selectedProducts.size > 0 && (
-          <div className="bg-primary-50 border-t border-primary-200 px-3 sm:px-4 py-2 sm:py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <p className="text-xs sm:text-sm text-primary-700">
-              <strong>{selectedProducts.size}</strong> produto{selectedProducts.size > 1 ? 's' : ''} selecionado{selectedProducts.size > 1 ? 's' : ''}
-            </p>
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-              <button onClick={() => { setSelectedProducts(new Set()); setSelectAll(false); }} className="text-xs sm:text-sm text-gray-600 hover:text-gray-800 underline">
-                Limpar
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-t border-blue-200/70 px-5 py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+                <CheckSquare className="w-3.5 h-3.5 text-white" />
+              </div>
+              <p className="text-sm text-blue-900">
+                <strong className="font-bold">{selectedProducts.size}</strong> produto
+                {selectedProducts.size > 1 ? 's' : ''} selecionado
+                {selectedProducts.size > 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setSelectedProducts(new Set());
+                  setSelectAll(false);
+                }}
+                className="text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors"
+              >
+                Limpar seleção
               </button>
-              <button onClick={openBulkDeleteModal} className="px-3 sm:px-4 py-1.5 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2">
-                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <button
+                onClick={openBulkDeleteModal}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl hover:shadow-lg hover:shadow-red-200 hover:-translate-y-0.5 transition-all text-xs font-bold shadow-sm"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
                 Excluir
               </button>
             </div>
@@ -571,187 +792,328 @@ const ProductsManager: React.FC = () => {
         )}
       </div>
 
-      {/* Modal de Criar/Editar Produto */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={handleCloseModal} />
-          <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl animate-[modalSlideUp_0.3s_ease] mx-2 sm:mx-0">
-            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between rounded-t-2xl">
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">
-                {editingProduct ? 'Editar Produto' : 'Novo Produto'}
+      {/* ==================== MODAL CRIAR/EDITAR ==================== */}
+      <ModalShell isOpen={showModal} onClose={handleCloseModal} size="lg">
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-xl border-b border-slate-200/70 px-6 py-4 flex items-center justify-between rounded-t-3xl">
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${
+                editingProduct
+                  ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-200'
+                  : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-200'
+              }`}
+            >
+              {editingProduct ? (
+                <Edit className="w-5 h-5 text-white" />
+              ) : (
+                <Plus className="w-5 h-5 text-white" />
+              )}
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                {editingProduct ? 'Editar produto' : 'Novo produto'}
               </h2>
-              <button onClick={handleCloseModal} className="p-1 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Nome do Produto *</label>
-                <input type="text" name="name" value={formData.name} onChange={handleInputChange} className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Preço (Kz) *</label>
-                  <input type="number" name="price" value={formData.price} onChange={handleInputChange} min="0" step="0.01" className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required />
-                </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Estoque *</label>
-                  <input type="number" name="stock" value={formData.stock} onChange={handleInputChange} min="0" className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Categoria *</label>
-                  <select name="category" value={formData.category} onChange={handleInputChange} className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required>
-                    <option value="">Selecione...</option>
-                    <option value="Audio">Áudio & Som</option>
-                    <option value="Computers">Computadores</option>
-                    <option value="Mobile">Telemóveis</option>
-                    <option value="Wearables">Acessórios</option>
-                    <option value="Gaming">Gaming</option>
-                    <option value="Accessories">Acessórios</option>
-                    <option value="Cameras">Câmeras</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Marca *</label>
-                  <select name="brand" value={formData.brand} onChange={handleInputChange} className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required>
-                    <option value="">Selecione...</option>
-                    <option value="Apple">Apple</option>
-                    <option value="Samsung">Samsung</option>
-                    <option value="Sony">Sony</option>
-                    <option value="Logitech">Logitech</option>
-                    <option value="Dell">Dell</option>
-                    <option value="TechBrand">TechBrand</option>
-                    <option value="SoundMax">SoundMax</option>
-                    <option value="GameTech">GameTech</option>
-                    <option value="FitTech">FitTech</option>
-                    <option value="PhotoPro">PhotoPro</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Avaliação (1-5)</label>
-                <select name="rating" value={formData.rating} onChange={handleInputChange} className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
-                  {[1, 2, 3, 4, 5].map(r => (
-                    <option key={r} value={r}>{r} ★</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">URL da Imagem *</label>
-                <input type="url" name="image" value={formData.image} onChange={handleInputChange} className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" required />
-                {formData.image && (
-                  <div className="mt-2">
-                    <img src={formData.image} alt="Preview" className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover border border-gray-200" />
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                <textarea name="description" value={formData.description} onChange={handleInputChange} rows={3} className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none resize-none" />
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 border-t border-gray-200">
-                <button type="button" onClick={handleCloseModal} className="w-full sm:flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={saving} className="w-full sm:flex-1 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
-                  {saving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      {editingProduct ? 'Atualizar' : 'Criar'}
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Exclusão Individual */}
-      {showDeleteModal && productToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={handleCloseDeleteModal} />
-          <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl animate-[modalSlideUp_0.3s_ease] mx-2 sm:mx-0">
-            <div className="p-4 sm:p-6 text-center">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4">
-                <AlertTriangle className="w-7 h-7 sm:w-8 sm:h-8 text-red-500" />
-              </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">Confirmar Exclusão</h3>
-              <p className="text-sm text-gray-600">Tem certeza que deseja excluir o produto <strong>"{productToDelete.name}"</strong>?</p>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">Esta ação não pode ser desfeita.</p>
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6">
-                <button onClick={handleCloseDeleteModal} className="w-full sm:flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm">
-                  Cancelar
-                </button>
-                <button onClick={handleDelete} disabled={deleting} className="w-full sm:flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
-                  {deleting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                      Excluindo...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4" />
-                      Excluir
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Exclusão em Massa */}
-      {showBulkDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setShowBulkDeleteModal(false)} />
-          <div className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl animate-[modalSlideUp_0.3s_ease] mx-2 sm:mx-0">
-            <div className="p-4 sm:p-6 text-center">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4">
-                <AlertTriangle className="w-7 h-7 sm:w-8 sm:h-8 text-red-500" />
-              </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">Excluir Produtos</h3>
-              <p className="text-sm text-gray-600">
-                Tem certeza que deseja excluir <strong>{selectedProducts.size}</strong> produto{selectedProducts.size > 1 ? 's' : ''} selecionado{selectedProducts.size > 1 ? 's' : ''}?
+              <p className="text-xs text-slate-500">
+                {editingProduct
+                  ? 'Atualize as informações do produto'
+                  : 'Preencha os dados do novo produto'}
               </p>
-              <p className="text-xs sm:text-sm text-red-500 mt-1">Esta ação não pode ser desfeita.</p>
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-6">
-                <button onClick={() => setShowBulkDeleteModal(false)} disabled={deleting} className="w-full sm:flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm disabled:opacity-50">
-                  Cancelar
-                </button>
-                <button onClick={executeBulkDelete} disabled={deleting} className="w-full sm:flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
-                  {deleting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                      Excluindo...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4" />
-                      Excluir {selectedProducts.size}
-                    </>
-                  )}
-                </button>
-              </div>
             </div>
           </div>
+          <button
+            onClick={handleCloseModal}
+            className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+          >
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
         </div>
-      )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <InputField id="name" label="NOME DO PRODUTO" icon={Package} required>
+            <input
+              id="name"
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              placeholder="Ex: iPhone 15 Pro Max"
+              className="w-full pl-10 pr-4 py-2.5 text-sm font-medium border border-slate-200 bg-white/60 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300 outline-none transition-all text-slate-900 placeholder-slate-400"
+              required
+            />
+          </InputField>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <InputField id="price" label="PREÇO (Kz)" icon={DollarSign} required>
+              <input
+                id="price"
+                type="number"
+                name="price"
+                value={formData.price}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="w-full pl-10 pr-4 py-2.5 text-sm font-medium border border-slate-200 bg-white/60 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300 outline-none transition-all text-slate-900"
+                required
+              />
+            </InputField>
+
+            <InputField id="stock" label="ESTOQUE" icon={Boxes} required>
+              <input
+                id="stock"
+                type="number"
+                name="stock"
+                value={formData.stock}
+                onChange={handleInputChange}
+                min="0"
+                className="w-full pl-10 pr-4 py-2.5 text-sm font-medium border border-slate-200 bg-white/60 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300 outline-none transition-all text-slate-900"
+                required
+              />
+            </InputField>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <InputField id="category" label="CATEGORIA" icon={Tag} required>
+              <select
+                id="category"
+                name="category"
+                value={formData.category}
+                onChange={handleInputChange}
+                className="w-full pl-10 pr-4 py-2.5 text-sm font-medium border border-slate-200 bg-white/60 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300 outline-none transition-all text-slate-900 appearance-none cursor-pointer"
+                required
+              >
+                <option value="">Selecione...</option>
+                <option value="Audio">Áudio & Som</option>
+                <option value="Computers">Computadores</option>
+                <option value="Mobile">Telemóveis</option>
+                <option value="Wearables">Acessórios</option>
+                <option value="Gaming">Gaming</option>
+                <option value="Accessories">Acessórios</option>
+                <option value="Cameras">Câmeras</option>
+              </select>
+            </InputField>
+
+            <InputField id="brand" label="MARCA" icon={Tag} required>
+              <select
+                id="brand"
+                name="brand"
+                value={formData.brand}
+                onChange={handleInputChange}
+                className="w-full pl-10 pr-4 py-2.5 text-sm font-medium border border-slate-200 bg-white/60 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300 outline-none transition-all text-slate-900 appearance-none cursor-pointer"
+                required
+              >
+                <option value="">Selecione...</option>
+                <option value="Apple">Apple</option>
+                <option value="Samsung">Samsung</option>
+                <option value="Sony">Sony</option>
+                <option value="Logitech">Logitech</option>
+                <option value="Dell">Dell</option>
+                <option value="TechBrand">TechBrand</option>
+                <option value="SoundMax">SoundMax</option>
+                <option value="GameTech">GameTech</option>
+                <option value="FitTech">FitTech</option>
+                <option value="PhotoPro">PhotoPro</option>
+              </select>
+            </InputField>
+          </div>
+
+          <InputField id="rating" label="AVALIAÇÃO" icon={Star}>
+            <select
+              id="rating"
+              name="rating"
+              value={formData.rating}
+              onChange={handleInputChange}
+              className="w-full pl-10 pr-4 py-2.5 text-sm font-medium border border-slate-200 bg-white/60 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300 outline-none transition-all text-slate-900 appearance-none cursor-pointer"
+            >
+              {[1, 2, 3, 4, 5].map((r) => (
+                <option key={r} value={r}>
+                  {r} {r === 1 ? 'estrela' : 'estrelas'}
+                </option>
+              ))}
+            </select>
+          </InputField>
+
+          <InputField id="image" label="URL DA IMAGEM" icon={ImageIcon} required>
+            <input
+              id="image"
+              type="url"
+              name="image"
+              value={formData.image}
+              onChange={handleInputChange}
+              placeholder="https://..."
+              className="w-full pl-10 pr-4 py-2.5 text-sm font-medium border border-slate-200 bg-white/60 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300 outline-none transition-all text-slate-900 placeholder-slate-400"
+              required
+            />
+          </InputField>
+
+          {formData.image && (
+            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200/70">
+              <img
+                src={formData.image}
+                alt="Preview"
+                className="w-16 h-16 rounded-xl object-cover border-2 border-white shadow-sm"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src =
+                    'https://via.placeholder.com/64/ef4444/ffffff?text=Erro';
+                }}
+              />
+              <div>
+                <p className="text-xs font-bold text-slate-700">Preview</p>
+                <p className="text-[11px] text-slate-500">Imagem carregada</p>
+              </div>
+            </div>
+          )}
+
+          <InputField id="description" label="DESCRIÇÃO" icon={FileText}>
+            <textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              rows={3}
+              placeholder="Descrição detalhada do produto..."
+              className="w-full pl-10 pr-4 py-2.5 text-sm font-medium border border-slate-200 bg-white/60 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-slate-300 outline-none transition-all text-slate-900 placeholder-slate-400 resize-none"
+            />
+          </InputField>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={handleCloseModal}
+              className="w-full sm:flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-semibold text-sm"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full sm:flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-200 hover:-translate-y-0.5 transition-all font-semibold text-sm disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  {editingProduct ? 'Atualizar' : 'Criar produto'}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </ModalShell>
+
+      {/* ==================== MODAL EXCLUSÃO INDIVIDUAL ==================== */}
+      <ModalShell
+        isOpen={showDeleteModal && !!productToDelete}
+        onClose={handleCloseDeleteModal}
+        size="sm"
+      >
+        <div className="p-6 text-center">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg shadow-red-200 mb-4">
+            <Trash2 className="w-7 h-7 text-white" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-2">Confirmar exclusão</h3>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Tem certeza que deseja excluir o produto{' '}
+            <strong className="text-slate-900">"{productToDelete?.name}"</strong>?
+          </p>
+          <p className="text-xs text-red-500 mt-1 font-medium">
+            Esta ação não pode ser desfeita.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3 mt-5">
+            <button
+              onClick={handleCloseDeleteModal}
+              className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-semibold text-sm"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl hover:shadow-lg hover:shadow-red-200 hover:-translate-y-0.5 transition-all font-semibold text-sm disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center gap-2"
+            >
+              {deleting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  Excluindo...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Excluir
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </ModalShell>
+
+      {/* ==================== MODAL EXCLUSÃO EM MASSA ==================== */}
+      <ModalShell
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        size="sm"
+      >
+        <div className="p-6 text-center">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg shadow-red-200 mb-4">
+            <Trash2 className="w-7 h-7 text-white" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-2">Excluir produtos</h3>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Tem certeza que deseja excluir{' '}
+            <strong className="text-slate-900">
+              {selectedProducts.size} produto{selectedProducts.size > 1 ? 's' : ''}
+            </strong>{' '}
+            selecionado{selectedProducts.size > 1 ? 's' : ''}?
+          </p>
+          <p className="text-xs text-red-500 mt-1 font-medium">
+            Esta ação não pode ser desfeita.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-3 mt-5">
+            <button
+              onClick={() => setShowBulkDeleteModal(false)}
+              disabled={deleting}
+              className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors font-semibold text-sm disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={executeBulkDelete}
+              disabled={deleting}
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl hover:shadow-lg hover:shadow-red-200 hover:-translate-y-0.5 transition-all font-semibold text-sm disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center gap-2"
+            >
+              {deleting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  Excluindo...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Excluir {selectedProducts.size}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </ModalShell>
+
+      {/* ==================== ANIMAÇÕES ==================== */}
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes modalSlideUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.98) }
+          to { opacity: 1; transform: translateY(0) scale(1) }
+        }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-in-out }
+        .animate-modalSlideUp { animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) }
+      `}</style>
     </div>
   );
 };
