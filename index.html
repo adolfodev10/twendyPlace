@@ -2,12 +2,145 @@
 <html lang="pt">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Twendy Create</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- ==================== SEO ==================== -->
+    <title>Twendy Create — Loja Oficial</title>
+    <meta
+      name="description"
+      content="Twendy Create — catálogo  de produtos com curadoria de qualidade, entrega rápida e pagamento facilitado."
+    />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="color-scheme" content="light" />
+
+    <!-- Open Graph (partilha em redes sociais) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Twendy Create" />
+    <meta property="og:title" content="Twendy Create — Loja Oficial" />
+    <meta
+      property="og:description"
+      content="Catálogo com curadoria de qualidade e entrega rápida."
+    />
+    <meta property="og:image" content="/logo.jpg" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Twendy Create — Loja Oficial" />
+    <meta
+      name="twitter:description"
+      content="Catálogo com curadoria de qualidade e entrega rápida."
+    />
+    <meta name="twitter:image" content="/logo.jpg" />
+
+    <!-- ==================== FAVICON ==================== -->
+    <link rel="icon" type="image/jpeg" href="/logo.jpg" />
+    <link rel="apple-touch-icon" href="/logo.jpg" />
+    <link rel="mask-icon" href="/logo.jpg" color="#2563eb" />
+
+    <!-- ==================== FONTES ==================== -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- ==================== PERFORMANCE ==================== -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
+
+    <style>
+      /* Reset mínimo + tipografia global */
+      * {
+        -webkit-tap-highlight-color: transparent;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        font-family: 'Inter', ui-sans-serif, system-ui, -apple-system,
+          BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        background-color: #f8fafc;
+      }
+      /* Scrollbar refinada */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 999px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+        background-clip: content-box;
+        border: 2px solid transparent;
+      }
+
+      /* Splash inicial (antes do React montar) */
+      #root:empty::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(135deg, #f8fafc 0%, #ffffff 50%, #eff6ff 100%);
+        z-index: 9999;
+      }
+      #root:empty::after {
+        content: '';
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 40px;
+        height: 40px;
+        margin: -20px 0 0 -20px;
+        border: 3px solid #e2e8f0;
+        border-top-color: #2563eb;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        z-index: 10000;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <noscript>
+      <div
+        style="
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: system-ui, sans-serif;
+          padding: 24px;
+          text-align: center;
+          color: #0f172a;
+        "
+      >
+        <div>
+          <h1 style="font-size: 20px; margin-bottom: 8px">
+            JavaScript desativado
+          </h1>
+          <p style="color: #64748b; font-size: 14px">
+            Ative o JavaScript no seu navegador para usar o Twendy Create.
+          </p>
+        </div>
+      </div>
+    </noscript>
   </body>
 </html>

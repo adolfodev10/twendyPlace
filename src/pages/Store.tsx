@@ -190,7 +190,7 @@ const Store: React.FC = () => {
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/70 backdrop-blur-sm border border-blue-100 shadow-sm mb-4">
                 <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                 <span className="text-xs font-semibold text-blue-700 tracking-wide">
-                  CATÁLOGO PREMIUM
+                  CATÁLOGO
                 </span>
               </div>
 
