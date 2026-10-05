@@ -613,10 +613,10 @@ const UsersManager: React.FC = () => {
                     <tr
                       key={getUserId(user) || index}
                       className={`border-b border-slate-100 transition-colors ${isSelected
-                          ? 'bg-blue-50/60'
-                          : isSelf
-                            ? 'bg-blue-50/30'
-                            : 'hover:bg-slate-50/60'
+                        ? 'bg-blue-50/60'
+                        : isSelf
+                          ? 'bg-blue-50/30'
+                          : 'hover:bg-slate-50/60'
                         }`}
                     >
                       {/* Checkbox */}
@@ -653,8 +653,8 @@ const UsersManager: React.FC = () => {
                             ) : (
                               <div
                                 className={`w-10 h-10 rounded-2xl flex items-center justify-center ${roleBadge.label === 'Admin'
-                                    ? 'bg-gradient-to-br from-red-500 to-rose-600'
-                                    : 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                                  ? 'bg-gradient-to-br from-red-500 to-rose-600'
+                                  : 'bg-gradient-to-br from-blue-500 to-indigo-600'
                                   }`}
                               >
                                 <span className="text-white font-bold text-xs">
@@ -791,8 +791,8 @@ const UsersManager: React.FC = () => {
           <div className="flex items-center gap-3">
             <div
               className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${editingUser
-                  ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-200'
-                  : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-200'
+                ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-200'
+                : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-200'
                 }`}
             >
               {editingUser ? (
