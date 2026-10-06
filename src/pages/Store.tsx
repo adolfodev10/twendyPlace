@@ -142,7 +142,6 @@ const Store: React.FC = () => {
     };
   }, [products]);
 
-  /* ----------------------------- LOADING ----------------------------- */
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/40">
@@ -175,9 +174,7 @@ const Store: React.FC = () => {
         user={user}
       />
 
-      {/* ============================ HERO ============================ */}
       <section className="relative overflow-hidden">
-        {/* Decoração de fundo */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl" />
           <div className="absolute top-10 right-0 w-96 h-96 bg-indigo-400/20 rounded-full blur-3xl" />
@@ -208,7 +205,6 @@ const Store: React.FC = () => {
                 lugar.
               </p>
 
-              {/* Mini stats */}
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 {[
                   {
@@ -240,7 +236,6 @@ const Store: React.FC = () => {
               </div>
             </div>
 
-            {/* Trust badges */}
             <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-3 lg:w-64">
               {[
                 {
@@ -281,10 +276,8 @@ const Store: React.FC = () => {
         </div>
       </section>
 
-      {/* ======================== CONTEÚDO ======================== */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-16">
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-          {/* Sidebar de filtros */}
           <aside className="lg:w-72 flex-shrink-0">
             <div className="lg:sticky lg:top-24">
               <Filters
@@ -295,7 +288,6 @@ const Store: React.FC = () => {
             </div>
           </aside>
 
-          {/* Grid principal */}
           <main className="flex-1 min-w-0">
             {error ? (
               <ErrorState error={error} />
@@ -307,7 +299,6 @@ const Store: React.FC = () => {
               />
             ) : (
               <>
-                {/* Barra de resultado */}
                 <div className="mb-5 p-4 rounded-2xl bg-white/80 backdrop-blur-sm border border-slate-200/70 shadow-sm">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -351,7 +342,6 @@ const Store: React.FC = () => {
   );
 };
 
-/* ============================ SUBCOMPONENTES ============================ */
 
 const ErrorState: React.FC<{ error: string }> = ({ error }) => (
   <div className="relative overflow-hidden rounded-3xl bg-white/80 backdrop-blur-sm border border-red-100 shadow-sm p-8 sm:p-12 text-center">

@@ -6,11 +6,6 @@ import { CartProvider } from './contexts/CartContext';
 import { AdminNotificationProvider } from './contexts/AdminNotificationContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
-/* ============================================================
- *  LAZY LOADING
- *  Cada página é carregada apenas quando acessada.
- *  Isso reduz o bundle inicial drasticamente.
- * ============================================================ */
 const Store = lazy(() => import('./pages/Store'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const Login = lazy(() => import('./components/auth/Login'));
@@ -19,10 +14,6 @@ const MyOrders = lazy(() => import('./pages/MyOrders'));
 const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'));
 const Profile = lazy(() => import('./pages/Profile'));
 
-/* ============================================================
- *  LOADING FALLBACK
- *  Mostrado enquanto uma página lazy é carregada.
- * ============================================================ */
 const PageLoader: React.FC = () => (
   <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/40 flex items-center justify-center">
     <div className="flex flex-col items-center gap-4">
@@ -35,13 +26,6 @@ const PageLoader: React.FC = () => (
   </div>
 );
 
-/* ============================================================
- *  APP
- *  Ordem dos providers (importante!):
- *  1. AuthProvider      → fornece user/loading
- *  2. AdminNotification → depende de useAuth()
- *  3. CartProvider      → depende de useAuth()
- * ============================================================ */
 function App() {
   return (
     <AuthProvider>
@@ -50,12 +34,10 @@ function App() {
           <BrowserRouter>
             <Suspense fallback={<PageLoader />}>
               <Routes>
-                {/* Públicas */}
                 <Route path="/" element={<Store />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
 
-                {/* Protegidas (usuário autenticado) */}
                 <Route
                   path="/my-orders"
                   element={
@@ -81,7 +63,6 @@ function App() {
                   }
                 />
 
-                {/* Admin (apenas role=admin) */}
                 <Route
                   path="/admin/*"
                   element={
@@ -91,12 +72,10 @@ function App() {
                   }
                 />
 
-                {/* 404 → Home */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
 
-            {/* ==================== TOASTS ==================== */}
             <Toaster
               position="bottom-right"
               reverseOrder={false}
